@@ -1,0 +1,945 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import type { StyleLibrary, AppSettings, PromptSchema } from '@/types';
+import { createEmptyPrompt, flattenPrompt, generateJsonPrompt, PROMPT_GROUPS } from '@/types';
+import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings, fileToBase64, generateId, callAI } from '@/lib/storage';
+import { type Locale, getLocale, setLocale as persistLocale, t, getGroupLabel, getFieldLabel } from '@/lib/i18n';
+
+// ============================================================
+// Main App Component
+// ============================================================
+
+type View = 'library' | 'create' | 'edit' | 'compare' | 'settings';
+
+export default function HomePage() {
+  const [view, setView] = useState<View>('library');
+  const [styles, setStyles] = useState<StyleLibrary[]>([]);
+  const [settings, setSettingsState] = useState<AppSettings | null>(null);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [locale, setLocaleState] = useState<Locale>('vi');
+
+  useEffect(() => {
+    setStyles(getStyles());
+    setSettingsState(getSettings());
+    setLocaleState(getLocale());
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  const switchLocale = (newLocale: Locale) => {
+    setLocaleState(newLocale);
+    persistLocale(newLocale);
+  };
+
+  const selectedStyle = styles.find(s => s.id === selectedStyleId);
+  const refreshStyles = () => setStyles(getStyles());
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  const handleCreateStyle = (style: StyleLibrary) => {
+    addStyle(style);
+    refreshStyles();
+    setSelectedStyleId(style.id);
+    setView('edit');
+    showToast(L('style_created'));
+  };
+
+  const handleUpdateStyle = (id: string, updates: Partial<StyleLibrary>) => {
+    updateStyle(id, updates);
+    refreshStyles();
+  };
+
+  const handleDeleteStyle = (id: string) => {
+    deleteStyle(id);
+    refreshStyles();
+    setView('library');
+    showToast(L('style_deleted'));
+  };
+
+  const handleSettingsSave = (newSettings: AppSettings) => {
+    saveSettings(newSettings);
+    setSettingsState(newSettings);
+    showToast(L('settings_saved'));
+  };
+
+  if (!settings) return null;
+
+  return (
+    <>
+      {/* Navigation */}
+      <nav className="nav-header">
+        <a href="#" className="nav-logo" onClick={(e) => { e.preventDefault(); setView('library'); }}>
+          <div className="nav-logo-icon">🎨</div>
+          <span className="nav-logo-text">{L('nav_title')}</span>
+        </a>
+        <div className="nav-actions">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+            <button className={`btn btn-sm ${locale === 'vi' ? 'btn-primary' : ''}`} onClick={() => switchLocale('vi')} style={{ padding: '4px 10px', fontSize: '0.8125rem' }}>🇻🇳 VI</button>
+            <button className={`btn btn-sm ${locale === 'en' ? 'btn-primary' : ''}`} onClick={() => switchLocale('en')} style={{ padding: '4px 10px', fontSize: '0.8125rem' }}>🇺🇸 EN</button>
+          </div>
+          <button className="btn btn-sm" onClick={() => setView('settings')}>{L('nav_settings')}</button>
+          <button className="btn btn-primary btn-sm" onClick={() => setView('create')}>{L('nav_new_style')}</button>
+        </div>
+      </nav>
+
+      <div className="fade-in">
+        {view === 'library' && <LibraryView styles={styles} locale={locale} onSelect={(id) => { setSelectedStyleId(id); setView('edit'); }} onCreate={() => setView('create')} onDelete={handleDeleteStyle} />}
+        {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
+        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onCompare={() => setView('compare')} showToast={showToast} />}
+        {view === 'compare' && selectedStyle && <CompareView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} />}
+        {view === 'settings' && <SettingsView settings={settings} locale={locale} onBack={() => setView('library')} onSave={handleSettingsSave} showToast={showToast} />}
+      </div>
+
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast ${toast.type}`}>
+            {toast.type === 'success' && '✓'} {toast.type === 'error' && '✗'} {toast.type === 'warning' && '⚠'} {toast.message}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================
+// Library View
+// ============================================================
+
+function LibraryView({ styles, locale, onSelect, onCreate, onDelete }: {
+  styles: StyleLibrary[];
+  locale: Locale;
+  onSelect: (id: string) => void;
+  onCreate: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+  return (
+    <div>
+      <div className="page-header"><h1 className="page-title">{L('lib_title')}</h1><p className="page-subtitle">{L('lib_subtitle')}</p></div>
+      {styles.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">🖼️</div>
+          <h2 className="empty-state-title">{L('lib_empty_title')}</h2>
+          <p className="empty-state-desc">{L('lib_empty_desc')}</p>
+          <button className="btn btn-primary btn-lg" onClick={onCreate}>{L('lib_empty_btn')}</button>
+        </div>
+      ) : (
+        <div className="styles-grid">
+          {styles.map((style) => (
+            <div key={style.id} className="style-card" onClick={() => onSelect(style.id)}>
+              <div className="style-card-images">
+                {style.reference_images.slice(0, 3).map((img, i) => (<img key={i} src={img} alt={`${style.name} ref ${i + 1}`} />))}
+                {style.reference_images.length === 0 && (<div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No images</div>)}
+              </div>
+              <div className="style-card-body">
+                <div className="style-card-name">{style.name}</div>
+                <div className="style-card-meta">
+                  <span className="style-card-badge">{style.prompt.subject_type}</span>
+                  <span>{style.reference_images.length} {L('lib_images')}</span>
+                  <span>{new Date(style.updated_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Create Style View — with analysis result summary
+// ============================================================
+
+function CreateStyleView({ settings, locale, onBack, onCreate, showToast }: {
+  settings: AppSettings;
+  locale: Locale;
+  onBack: () => void;
+  onCreate: (style: StyleLibrary) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+}) {
+  const [images, setImages] = useState<string[]>([]);
+  const [styleName, setStyleName] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<{ style: StyleLibrary; fieldCount: number } | null>(null);
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  const handleFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => f.type.startsWith('image/'));
+    const base64s = await Promise.all(fileArray.map(fileToBase64));
+    setImages(prev => [...prev, ...base64s]);
+  };
+
+  const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); };
+
+  const handleAnalyze = async () => {
+    if (images.length === 0) { showToast(L('create_upload_warning'), 'warning'); return; }
+    setAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const result = await callAI(settings, 'analyzeStyle', images);
+      const prompt: PromptSchema = {
+        ...createEmptyPrompt(styleName || result.style_name || 'Untitled Style'),
+        ...result,
+        style_name: styleName || result.style_name || 'Untitled Style',
+      };
+
+      // Count filled fields
+      let fieldCount = 0;
+      for (const [key, value] of Object.entries(prompt)) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          for (const [, fv] of Object.entries(value as Record<string, unknown>)) {
+            if (fv !== null && fv !== undefined && fv !== '') {
+              if (Array.isArray(fv) && fv.length === 0) continue;
+              fieldCount++;
+            }
+          }
+        }
+      }
+
+      const style: StyleLibrary = {
+        id: generateId(),
+        name: prompt.style_name,
+        description: '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        reference_images: images,
+        prompt,
+        prompt_history: [prompt],
+        generated_images: [],
+      };
+
+      setAnalysisResult({ style, fieldCount });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Analysis failed', 'error');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleAcceptResult = () => {
+    if (analysisResult) {
+      onCreate(analysisResult.style);
+    }
+  };
+
+  return (
+    <div>
+      <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_library')}</a>
+      <div className="page-header"><h1 className="page-title">{L('create_title')}</h1><p className="page-subtitle">{L('create_subtitle')}</p></div>
+
+      <div className="form-group">
+        <label className="form-label">{L('create_style_name')}</label>
+        <input className="form-input" placeholder={L('create_style_name_placeholder')} value={styleName} onChange={(e) => setStyleName(e.target.value)} />
+      </div>
+
+      <div className={`upload-zone ${dragOver ? 'dragover' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop}
+        onClick={() => document.getElementById('file-input')?.click()}>
+        <div className="upload-zone-icon">📁</div>
+        <div className="upload-zone-title">{L('create_drop_title')}</div>
+        <div className="upload-zone-desc">{L('create_drop_desc')}</div>
+        <input id="file-input" type="file" multiple accept="image/*" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+      </div>
+
+      {images.length > 0 && (
+        <div className="image-gallery">
+          {images.map((img, i) => (
+            <div key={i} className="image-thumb"><img src={img} alt={`Upload ${i + 1}`} />
+              <button className="image-thumb-remove" onClick={(e) => { e.stopPropagation(); setImages(prev => prev.filter((_, idx) => idx !== i)); }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+        <button className="btn btn-primary btn-lg" onClick={handleAnalyze} disabled={analyzing || images.length === 0}>
+          {analyzing ? <><span className="loading-spinner"></span> {L('create_analyzing')}</> : <>{L('create_analyze_btn')}</>}
+        </button>
+      </div>
+
+      {analyzing && (
+        <div className="analysis-progress slide-in" style={{ marginTop: '24px' }}>
+          <div className="loading-bar"></div>
+          <h3 className="analysis-progress-title" style={{ marginTop: '16px' }}>{L('create_analyzing_title')}</h3>
+          <p className="analysis-progress-desc">{L('create_analyzing_desc')}</p>
+        </div>
+      )}
+
+      {/* Analysis Result Summary */}
+      {analysisResult && (
+        <div className="card slide-in" style={{ marginTop: '24px', border: '1px solid var(--accent-success)', background: 'rgba(16,185,129,0.05)' }}>
+          <div className="card-header">
+            <h3 className="card-title" style={{ color: 'var(--accent-success)' }}>{L('analysis_complete')}</h3>
+            <span style={{ fontSize: '0.875rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
+              {analysisResult.fieldCount} {L('analysis_fields_detected')}
+            </span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>{L('analysis_summary')}</p>
+
+          {/* Preview detected values by group */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+            {PROMPT_GROUPS.slice(0, 8).map((group) => {
+              const localizedGroup = getGroupLabel(locale, group.key);
+              const groupLabel = localizedGroup.label || group.label;
+              const groupData = (analysisResult.style.prompt as unknown as Record<string, Record<string, unknown>>)[group.key] as Record<string, unknown> | null;
+              if (!groupData) return null;
+              const filledFields = Object.entries(groupData).filter(([, v]) => {
+                if (v === null || v === undefined || v === '') return false;
+                if (Array.isArray(v) && v.length === 0) return false;
+                return true;
+              });
+              if (filledFields.length === 0) return null;
+              return (
+                <div key={group.key} style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent-primary)' }}>
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '6px' }}>{group.icon} {groupLabel}</div>
+                  {filledFields.slice(0, 3).map(([k, v]) => {
+                    const locField = getFieldLabel(locale, group.key, k);
+                    const label = locField.label || k.replace(/_/g, ' ');
+                    return (
+                      <div key={k} style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                        <span style={{ color: 'var(--text-tertiary)' }}>{label}: </span>
+                        <span>{Array.isArray(v) ? v.join(', ') : String(v).substring(0, 60)}{String(v).length > 60 ? '...' : ''}</span>
+                      </div>
+                    );
+                  })}
+                  {filledFields.length > 3 && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>+{filledFields.length - 3} more...</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          <button className="btn btn-primary btn-lg" onClick={handleAcceptResult} style={{ width: '100%' }}>
+            {L('analysis_view_edit')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Edit Style View (Prompt Editor) — with localized field labels
+// ============================================================
+
+function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, showToast }: {
+  style: StyleLibrary;
+  settings: AppSettings;
+  locale: Locale;
+  onBack: () => void;
+  onUpdate: (id: string, updates: Partial<StyleLibrary>) => void;
+  onCompare: () => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+}) {
+  const [prompt, setPrompt] = useState<PromptSchema>(style.prompt);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ subject: true, artistic_style: true });
+  const [activeTab, setActiveTab] = useState<'editor' | 'output' | 'json'>('editor');
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  const flattened = flattenPrompt(prompt);
+  const jsonPrompt = generateJsonPrompt(prompt);
+  const jsonPromptStr = JSON.stringify(jsonPrompt, null, 2);
+
+  const toggleGroup = (key: string) => setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const updateField = (groupKey: string, fieldKey: string, value: string | string[] | number | null) => {
+    setPrompt(prev => {
+      const updated = { ...prev };
+      const group = { ...(updated as unknown as Record<string, Record<string, unknown>>)[groupKey] };
+      if (value === '' || (Array.isArray(value) && value.length === 0)) {
+        group[fieldKey] = groupKey === 'negative_prompt' ? [] : null;
+      } else {
+        group[fieldKey] = value;
+      }
+      (updated as unknown as Record<string, Record<string, unknown>>)[groupKey] = group;
+      return updated;
+    });
+  };
+
+  const handleSave = () => {
+    onUpdate(style.id, { prompt, prompt_history: [...style.prompt_history, prompt], name: prompt.style_name });
+    showToast(L('edit_saved'));
+  };
+
+  const handleCopy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); showToast(L('edit_copied')); } catch { showToast(L('edit_copy_failed'), 'error'); }
+  };
+
+  const subjectTypes: Array<{ value: string; label: string }> = [
+    { value: 'character', label: L('st_character') }, { value: 'animal', label: L('st_animal') },
+    { value: 'object', label: L('st_object') }, { value: 'product', label: L('st_product') },
+    { value: 'scene', label: L('st_scene') }, { value: 'architecture', label: L('st_architecture') },
+    { value: 'food', label: L('st_food') }, { value: 'vehicle', label: L('st_vehicle') },
+    { value: 'nature', label: L('st_nature') }, { value: 'abstract', label: L('st_abstract') },
+    { value: 'other', label: L('st_other') },
+  ];
+
+  return (
+    <div>
+      <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_library')}</a>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div><h1 className="page-title">{style.name}</h1><p className="page-subtitle">{L('edit_subtitle')}</p></div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn" onClick={onCompare}>{L('edit_improve_btn')}</button>
+          <button className="btn btn-primary" onClick={handleSave}>{L('edit_save_btn')}</button>
+        </div>
+      </div>
+
+      {style.reference_images.length > 0 && (
+        <div className="image-gallery" style={{ marginBottom: '24px' }}>
+          {style.reference_images.map((img, i) => (<div key={i} className="image-thumb"><img src={img} alt={`Reference ${i + 1}`} /></div>))}
+        </div>
+      )}
+
+      <div className="tabs">
+        <button className={`tab ${activeTab === 'editor' ? 'active' : ''}`} onClick={() => setActiveTab('editor')}>{L('edit_tab_editor')}</button>
+        <button className={`tab ${activeTab === 'output' ? 'active' : ''}`} onClick={() => setActiveTab('output')}>{L('edit_tab_output')}</button>
+        <button className={`tab ${activeTab === 'json' ? 'active' : ''}`} onClick={() => setActiveTab('json')}>{L('edit_tab_json')}</button>
+      </div>
+
+      {activeTab === 'editor' && (
+        <div className="two-col-layout">
+          <div className="main-col">
+            <div className="card" style={{ marginBottom: '12px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">{L('edit_subject_type')}</label>
+                <select className="form-select" value={prompt.subject_type}
+                  onChange={(e) => setPrompt(prev => ({ ...prev, subject_type: e.target.value as PromptSchema['subject_type'] }))}>
+                  {subjectTypes.map(st => (<option key={st.value} value={st.value}>{st.label}</option>))}
+                </select>
+              </div>
+            </div>
+
+            {PROMPT_GROUPS.map((group) => {
+              if (group.condition && !group.condition(prompt)) return null;
+              const groupData = (prompt as unknown as Record<string, Record<string, unknown>>)[group.key] as Record<string, unknown> | null;
+              if (!groupData) return null;
+
+              const isOpen = openGroups[group.key] ?? false;
+              const filledCount = Object.entries(groupData).filter(([k, v]) => {
+                if (k.startsWith('_')) return false;
+                if (v === null || v === undefined || v === '') return false;
+                if (Array.isArray(v) && v.length === 0) return false;
+                return true;
+              }).length;
+
+              // Localized group label
+              const localizedGroup = getGroupLabel(locale, group.key);
+              const groupLabel = localizedGroup.label || group.label;
+              const groupDesc = localizedGroup.description || group.description;
+
+              return (
+                <div key={group.key} className="section-group">
+                  <div className="section-header" onClick={() => toggleGroup(group.key)}>
+                    <span className="section-icon">{group.icon}</span>
+                    <div className="section-info">
+                      <div className="section-label">
+                        {groupLabel}
+                        {filledCount > 0 && (<span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginLeft: '8px', fontWeight: 400 }}>{filledCount} {L('edit_fields')}</span>)}
+                      </div>
+                      <div className="section-desc">{groupDesc}</div>
+                    </div>
+                    <span className={`section-toggle ${isOpen ? 'open' : ''}`}>▼</span>
+                  </div>
+                  <div className={`section-body ${isOpen ? '' : 'hidden'}`}>
+                    {group.fields.map((field) => {
+                      const locField = getFieldLabel(locale, group.key, field.key);
+                      return (
+                        <FieldInput
+                          key={field.key}
+                          field={{
+                            ...field,
+                            label: locField.label || field.label,
+                            description: locField.description || field.description,
+                            placeholder: locField.placeholder || field.placeholder,
+                          }}
+                          locale={locale}
+                          value={(groupData[field.key] as string | string[] | number | null) ?? (field.type === 'tags' ? [] : null)}
+                          onChange={(val) => updateField(group.key, field.key, val)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="side-col">
+            <div className="card" style={{ position: 'sticky', top: '24px' }}>
+              <div className="card-header">
+                <h3 className="card-title">{L('edit_live_preview')}</h3>
+                <button className="btn btn-sm" onClick={() => handleCopy(jsonPromptStr)}>{L('edit_copy')}</button>
+              </div>
+              <pre className="prompt-output" style={{ maxHeight: '60vh', overflow: 'auto', fontSize: '0.8125rem' }}>
+                {jsonPromptStr || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>{L('edit_fill_fields')}</span>}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'output' && (
+        <div>
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">{L('edit_json_prompt')}</h3>
+              <button className="btn btn-sm btn-primary" onClick={() => handleCopy(jsonPromptStr)}>{L('edit_copy_json')}</button>
+            </div>
+            <pre className="prompt-output" style={{ fontSize: '0.9375rem', lineHeight: '1.7', maxHeight: '70vh', overflow: 'auto' }}>
+              {jsonPromptStr || L('edit_no_content')}
+            </pre>
+          </div>
+          <div className="card" style={{ marginTop: '16px' }}>
+            <div className="card-header">
+              <h3 className="card-title">📝 Text Prompt</h3>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-sm btn-success" onClick={() => handleCopy(flattened.positive)}>📋 {L('edit_positive')}</button>
+                {flattened.negative && <button className="btn btn-sm btn-danger" onClick={() => handleCopy(flattened.negative)}>📋 {L('edit_negative')}</button>}
+              </div>
+            </div>
+            <div className="prompt-output">
+              <div className="prompt-output-label">✅ {L('edit_positive')}</div>
+              <div className="prompt-output-positive" style={{ fontSize: '0.9375rem' }}>{flattened.positive || L('edit_no_content')}</div>
+              {flattened.negative && (<><div className="prompt-output-label" style={{ marginTop: '20px' }}>🚫 {L('edit_negative')}</div><div className="prompt-output-negative" style={{ fontSize: '0.9375rem' }}>{flattened.negative}</div></>)}
+            </div>
+          </div>
+          {prompt.generation_params && (
+            <div className="card" style={{ marginTop: '16px' }}>
+              <div className="card-header"><h3 className="card-title">{L('edit_gen_params')}</h3></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                {Object.entries(prompt.generation_params).map(([key, value]) => {
+                  if (value === null || value === undefined) return null;
+                  const locField = getFieldLabel(locale, 'generation_params', key);
+                  const label = locField.label || key.replace(/_/g, ' ');
+                  return (
+                    <div key={key} style={{ padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{String(value)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'json' && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">{L('edit_raw_json')}</h3>
+            <button className="btn btn-sm" onClick={() => handleCopy(JSON.stringify(prompt, null, 2))}>📋 {L('edit_copy')}</button>
+          </div>
+          <pre className="prompt-output" style={{ maxHeight: '70vh', overflow: 'auto' }}>{JSON.stringify(prompt, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Field Input Component
+// ============================================================
+
+function FieldInput({ field, locale, value, onChange }: {
+  field: { key: string; label: string; description: string; type: string; options?: string[]; placeholder?: string };
+  locale: Locale;
+  value: string | string[] | number | null;
+  onChange: (val: string | string[] | number | null) => void;
+}) {
+  const [tagInput, setTagInput] = useState('');
+
+  if (field.type === 'tags') {
+    const tags = Array.isArray(value) ? value : [];
+    return (
+      <div className="form-group">
+        <label className="form-label">{field.label}</label>
+        <div className="tags-container" onClick={() => document.getElementById(`tag-${field.key}`)?.focus()}>
+          {tags.map((tag, i) => (<span key={i} className="tag">{tag}<button className="tag-remove" onClick={() => onChange(tags.filter((_, idx) => idx !== i))}>×</button></span>))}
+          <input id={`tag-${field.key}`} className="tags-input" placeholder={tags.length === 0 ? field.placeholder : ''} value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && tagInput.trim()) { e.preventDefault(); onChange([...tags, tagInput.trim()]); setTagInput(''); }
+              if (e.key === 'Backspace' && !tagInput && tags.length > 0) { onChange(tags.slice(0, -1)); }
+            }} />
+        </div>
+      </div>
+    );
+  }
+  if (field.type === 'textarea') {
+    return (<div className="form-group"><label className="form-label">{field.label}</label><textarea className="form-textarea" placeholder={field.placeholder} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)} rows={3} /></div>);
+  }
+  if (field.type === 'number') {
+    return (<div className="form-group"><label className="form-label">{field.label}</label><input className="form-input" type="number" placeholder={field.placeholder} value={value !== null && value !== undefined ? String(value) : ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)} step="any" /></div>);
+  }
+  if (field.type === 'select' && field.options) {
+    return (<div className="form-group"><label className="form-label">{field.label}</label><select className="form-select" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)}><option value="">{t(locale, 'select_placeholder')}</option>{field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>);
+  }
+  return (<div className="form-group"><label className="form-label">{field.label}</label><input className="form-input" placeholder={field.placeholder} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value || null)} /></div>);
+}
+
+// ============================================================
+// Compare View — with selectable improvements
+// ============================================================
+
+function CompareView({ style, settings, locale, onBack, onUpdate, showToast }: {
+  style: StyleLibrary;
+  settings: AppSettings;
+  locale: Locale;
+  onBack: () => void;
+  onUpdate: (id: string, updates: Partial<StyleLibrary>) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+}) {
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [promptText, setPromptText] = useState(flattenPrompt(style.prompt).positive);
+  const [comparing, setComparing] = useState(false);
+  const [comparison, setComparison] = useState<{
+    differences: Array<{ category: string; field: string; current_value: string | null; suggested_value: string; severity: string; description: string }>;
+    similarity_score: number;
+    summary: string;
+  } | null>(null);
+  const [suggestedPrompt, setSuggestedPrompt] = useState<PromptSchema | null>(null);
+  const [selectedDiffs, setSelectedDiffs] = useState<Record<number, boolean>>({});
+  const [dragOver, setDragOver] = useState(false);
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  const handleFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => f.type.startsWith('image/'));
+    const base64s = await Promise.all(fileArray.map(fileToBase64));
+    setGeneratedImages(prev => [...prev, ...base64s]);
+  };
+
+  const handleCompare = async () => {
+    if (generatedImages.length === 0) { showToast(L('compare_upload_warning'), 'warning'); return; }
+    setComparing(true);
+    setComparison(null);
+    setSuggestedPrompt(null);
+    setSelectedDiffs({});
+    try {
+      // Step 1: Compare images
+      const compResult = await callAI(settings, 'compareImages', generatedImages, {
+        prompt_context: JSON.stringify(style.prompt, null, 2),
+        reference_images: style.reference_images,
+      });
+      setComparison(compResult);
+
+      // Select all by default
+      const defaultSelected: Record<number, boolean> = {};
+      if (compResult.differences) {
+        compResult.differences.forEach((_: unknown, i: number) => { defaultSelected[i] = true; });
+      }
+      setSelectedDiffs(defaultSelected);
+
+      // Step 2: Get suggested improvements
+      const improved = await callAI(settings, 'suggestImprovements', style.reference_images, {
+        prompt_context: JSON.stringify({ comparison: compResult, current_prompt: style.prompt }, null, 2),
+      });
+      setSuggestedPrompt(improved);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Comparison failed', 'error');
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  const toggleDiff = (index: number) => {
+    setSelectedDiffs(prev => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  const selectAllDiffs = () => {
+    if (!comparison) return;
+    const all: Record<number, boolean> = {};
+    comparison.differences.forEach((_, i) => { all[i] = true; });
+    setSelectedDiffs(all);
+  };
+
+  const handleApplySelected = () => {
+    if (!suggestedPrompt || !comparison) return;
+
+    // Build a merged prompt: start from current, apply only selected diff fields from suggested
+    const mergedPrompt = JSON.parse(JSON.stringify(style.prompt)) as Record<string, unknown>;
+    const suggestedFlat = suggestedPrompt as unknown as Record<string, Record<string, unknown>>;
+
+    comparison.differences.forEach((diff, i) => {
+      if (!selectedDiffs[i]) return; // Skip unselected
+      const groupKey = diff.category;
+      const fieldKey = diff.field;
+      if (suggestedFlat[groupKey] && suggestedFlat[groupKey][fieldKey] !== undefined) {
+        if (!mergedPrompt[groupKey] || typeof mergedPrompt[groupKey] !== 'object') return;
+        (mergedPrompt[groupKey] as Record<string, unknown>)[fieldKey] = suggestedFlat[groupKey][fieldKey];
+      }
+    });
+
+    const selectedCount = Object.values(selectedDiffs).filter(Boolean).length;
+    onUpdate(style.id, {
+      prompt: mergedPrompt as unknown as PromptSchema,
+      prompt_history: [...style.prompt_history, mergedPrompt as unknown as PromptSchema],
+    });
+    showToast(`${L('compare_applied')} (${selectedCount}/${comparison.differences.length})`);
+    onBack();
+  };
+
+  return (
+    <div>
+      <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_editor')}</a>
+      <div className="page-header">
+        <h1 className="page-title">{L('compare_title')} — {style.name}</h1>
+        <p className="page-subtitle">{L('compare_subtitle')}</p>
+      </div>
+
+      <div className="comparison-container">
+        <div className="comparison-panel">
+          <div className="comparison-panel-header">{L('compare_ref_images')}</div>
+          <div className="comparison-panel-body">
+            <div className="image-gallery">
+              {style.reference_images.map((img, i) => (<div key={i} className="image-thumb"><img src={img} alt={`Reference ${i + 1}`} /></div>))}
+            </div>
+          </div>
+        </div>
+        <div className="comparison-panel">
+          <div className="comparison-panel-header">{L('compare_gen_images')}</div>
+          <div className="comparison-panel-body">
+            <div className={`upload-zone ${dragOver ? 'dragover' : ''}`} style={{ padding: '24px 16px' }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+              onClick={() => document.getElementById('gen-file-input')?.click()}>
+              <div className="upload-zone-title" style={{ fontSize: '0.875rem' }}>{L('compare_drop_gen')}</div>
+              <input id="gen-file-input" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+            </div>
+            {generatedImages.length > 0 && (
+              <div className="image-gallery">
+                {generatedImages.map((img, i) => (<div key={i} className="image-thumb"><img src={img} alt={`Generated ${i + 1}`} /><button className="image-thumb-remove"
+                  onClick={(e) => { e.stopPropagation(); setGeneratedImages(prev => prev.filter((_, idx) => idx !== i)); }}>✕</button></div>))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: '20px' }}>
+        <div className="card-header"><h3 className="card-title">{L('compare_prompt_used')}</h3></div>
+        <textarea className="form-textarea" value={promptText} onChange={(e) => setPromptText(e.target.value)} rows={4} placeholder={L('compare_prompt_placeholder')} />
+      </div>
+
+      <div style={{ marginTop: '20px', textAlign: 'center' }}>
+        <button className="btn btn-primary btn-lg" onClick={handleCompare} disabled={comparing || generatedImages.length === 0}>
+          {comparing ? <><span className="loading-spinner"></span> {L('compare_analyzing')}</> : <>{L('compare_btn')}</>}
+        </button>
+      </div>
+
+      {comparing && (
+        <div className="analysis-progress slide-in" style={{ marginTop: '24px' }}>
+          <div className="loading-bar"></div>
+          <h3 className="analysis-progress-title" style={{ marginTop: '16px' }}>{L('compare_analyzing_title')}</h3>
+          <p className="analysis-progress-desc">{L('compare_analyzing_desc')}</p>
+        </div>
+      )}
+
+      {/* Comparison Results with Selectable Improvements */}
+      {comparison && (
+        <div className="slide-in" style={{ marginTop: '24px' }}>
+          {/* Summary Card */}
+          <div className="card" style={{ marginBottom: '16px' }}>
+            <div className="card-header">
+              <h3 className="card-title">{L('compare_results')}</h3>
+              <span style={{
+                padding: '4px 16px',
+                borderRadius: '20px',
+                fontWeight: 700,
+                fontSize: '0.9375rem',
+                background: comparison.similarity_score >= 80 ? 'rgba(16,185,129,0.15)' : comparison.similarity_score >= 50 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                color: comparison.similarity_score >= 80 ? 'var(--accent-success)' : comparison.similarity_score >= 50 ? 'var(--accent-warning)' : 'var(--accent-danger)',
+              }}>
+                {comparison.similarity_score}% {L('compare_similarity')}
+              </span>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>{comparison.summary}</p>
+          </div>
+
+          {/* Differences — Selectable */}
+          {comparison.differences && comparison.differences.length > 0 ? (
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">{L('compare_review_title')}</h3>
+                <button className="btn btn-sm" onClick={selectAllDiffs}>{L('compare_accept_all')}</button>
+              </div>
+
+              {comparison.differences.map((diff, i) => {
+                const isSelected = selectedDiffs[i] ?? false;
+                const locGroup = getGroupLabel(locale, diff.category);
+                const locField = getFieldLabel(locale, diff.category, diff.field);
+                const catLabel = locGroup.label || diff.category;
+                const fieldLabel = locField.label || diff.field;
+
+                return (
+                  <div key={i}
+                    onClick={() => toggleDiff(i)}
+                    style={{
+                      padding: '16px',
+                      margin: '8px 0',
+                      borderRadius: 'var(--radius-sm)',
+                      border: `2px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+                      background: isSelected ? 'rgba(99,102,241,0.05)' : 'var(--bg-tertiary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          width: '20px', height: '20px', borderRadius: '4px',
+                          border: `2px solid ${isSelected ? 'var(--accent-primary)' : 'var(--text-muted)'}`,
+                          background: isSelected ? 'var(--accent-primary)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#fff', fontSize: '0.75rem', fontWeight: 700,
+                        }}>{isSelected ? '✓' : ''}</div>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{catLabel} → {fieldLabel}</span>
+                      </div>
+                      <span style={{
+                        padding: '2px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600,
+                        background: diff.severity === 'major' ? 'rgba(239,68,68,0.15)' : diff.severity === 'moderate' ? 'rgba(245,158,11,0.15)' : 'rgba(6,182,212,0.15)',
+                        color: diff.severity === 'major' ? 'var(--accent-danger)' : diff.severity === 'moderate' ? 'var(--accent-warning)' : 'var(--accent-secondary)',
+                      }}>{diff.severity}</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>{diff.description}</div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(239,68,68,0.08)', borderLeft: '3px solid var(--accent-danger)' }}>
+                        <div style={{ fontSize: '0.6875rem', color: 'var(--accent-danger)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase' }}>{L('compare_original')}</div>
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{diff.current_value || 'null'}</div>
+                      </div>
+                      <div style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(16,185,129,0.08)', borderLeft: '3px solid var(--accent-success)' }}>
+                        <div style={{ fontSize: '0.6875rem', color: 'var(--accent-success)', fontWeight: 600, marginBottom: '2px', textTransform: 'uppercase' }}>{L('compare_improved')}</div>
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{diff.suggested_value}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Apply selected button */}
+              {suggestedPrompt && (
+                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                  <button className="btn btn-primary btn-lg" onClick={handleApplySelected}
+                    disabled={Object.values(selectedDiffs).filter(Boolean).length === 0}>
+                    {L('compare_apply_btn')} ({Object.values(selectedDiffs).filter(Boolean).length}/{comparison.differences.length})
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="card" style={{ textAlign: 'center', padding: '32px' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✅</div>
+              <p style={{ color: 'var(--text-secondary)' }}>{L('compare_no_diff')}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Settings View
+// ============================================================
+
+function SettingsView({ settings, locale, onBack, onSave, showToast }: {
+  settings: AppSettings;
+  locale: Locale;
+  onBack: () => void;
+  onSave: (settings: AppSettings) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+}) {
+  const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
+  const [testingProvider, setTestingProvider] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  const providers: Array<{ type: 'openai' | 'anthropic' | 'openrouter' | 'litellm'; name: string; icon: string }> = [
+    { type: 'openai', name: 'OpenAI', icon: '🟢' }, { type: 'anthropic', name: 'Anthropic', icon: '🟠' },
+    { type: 'openrouter', name: 'OpenRouter', icon: '🔵' }, { type: 'litellm', name: 'LiteLLM', icon: '🟣' },
+  ];
+
+  const updateProvider = (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm', field: string, value: string) => {
+    setLocalSettings(prev => ({ ...prev, providers: { ...prev.providers, [type]: { ...prev.providers[type], [field]: value } } }));
+    setTestResults(prev => { const next = { ...prev }; delete next[type]; return next; });
+  };
+
+  const handleTestKey = async (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm') => {
+    const config = localSettings.providers[type];
+    if (!config.api_key) { showToast(L('settings_enter_key'), 'warning'); return; }
+    setTestingProvider(type);
+    try {
+      const response = await fetch('/api/test-key', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: type, api_key: config.api_key, base_url: config.base_url, model: config.model }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTestResults(prev => ({ ...prev, [type]: { success: true, message: data.message } }));
+        showToast(L('settings_test_ok'));
+      } else {
+        setTestResults(prev => ({ ...prev, [type]: { success: false, message: data.error } }));
+        showToast(`${L('settings_test_fail')}${data.error}`, 'error');
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Network error';
+      setTestResults(prev => ({ ...prev, [type]: { success: false, message: msg } }));
+      showToast(`${L('settings_test_fail')}${msg}`, 'error');
+    } finally { setTestingProvider(null); }
+  };
+
+  return (
+    <div>
+      <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_library')}</a>
+      <div className="page-header"><h1 className="page-title">{L('settings_title')}</h1><p className="page-subtitle">{L('settings_subtitle')}</p></div>
+
+      <div className="form-group" style={{ marginBottom: '24px' }}>
+        <label className="form-label">{L('settings_active_provider')}</label>
+        <select className="form-select" value={localSettings.active_provider}
+          onChange={(e) => setLocalSettings(prev => ({ ...prev, active_provider: e.target.value as AppSettings['active_provider'] }))} style={{ maxWidth: '300px' }}>
+          {providers.map(p => (<option key={p.type} value={p.type}>{p.icon} {p.name}</option>))}
+        </select>
+      </div>
+
+      <div className="settings-grid">
+        {providers.map(p => {
+          const config = localSettings.providers[p.type];
+          const isActive = localSettings.active_provider === p.type;
+          const testResult = testResults[p.type];
+          const isTesting = testingProvider === p.type;
+          return (
+            <div key={p.type} className={`card provider-card ${isActive ? 'active' : ''}`}>
+              {isActive && <span className="provider-badge active">✓ Active</span>}
+              <h3 className="card-title" style={{ marginBottom: '16px' }}>{p.icon} {p.name}</h3>
+              <div className="form-group"><label className="form-label">{L('settings_api_key')}</label><input className="form-input" type="password" placeholder={`${p.name} API key...`} value={config.api_key} onChange={(e) => updateProvider(p.type, 'api_key', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">{L('settings_base_url')}</label><input className="form-input" placeholder="API base URL" value={config.base_url} onChange={(e) => updateProvider(p.type, 'base_url', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">{L('settings_model')}</label><input className="form-input" placeholder="Model name" value={config.model} onChange={(e) => updateProvider(p.type, 'model', e.target.value)} /></div>
+              <button className={`btn btn-sm ${testResult?.success ? 'btn-success' : ''}`} onClick={() => handleTestKey(p.type)} disabled={isTesting} style={{ width: '100%' }}>
+                {isTesting ? <><span className="loading-spinner"></span> {L('settings_testing')}</> : testResult ? (testResult.success ? L('settings_test_ok') : `❌ ${L('settings_test_btn')}`) : L('settings_test_btn')}
+              </button>
+              {testResult && (
+                <div style={{ marginTop: '8px', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem',
+                  background: testResult.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                  color: testResult.success ? 'var(--accent-success)' : 'var(--accent-danger)',
+                  borderLeft: `3px solid ${testResult.success ? 'var(--accent-success)' : 'var(--accent-danger)'}`,
+                }}>{testResult.message}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+        <button className="btn btn-primary btn-lg" onClick={() => onSave(localSettings)}>{L('settings_save_btn')}</button>
+        <button className="btn btn-lg" onClick={onBack}>{L('settings_cancel')}</button>
+      </div>
+    </div>
+  );
+}
