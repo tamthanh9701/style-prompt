@@ -102,7 +102,7 @@ export function generateId(): string {
 
 export async function callAI(
   settings: AppSettings,
-  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements',
+  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant',
   images: string[],
   options?: { prompt_context?: string; reference_images?: string[] }
 ) {

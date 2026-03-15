@@ -10,7 +10,7 @@ import { type Locale, getLocale, setLocale as persistLocale, t, getGroupLabel, g
 // Main App Component
 // ============================================================
 
-type View = 'library' | 'create' | 'edit' | 'compare' | 'settings';
+type View = 'library' | 'create' | 'edit' | 'compare' | 'generate' | 'settings';
 
 export default function HomePage() {
   const [view, setView] = useState<View>('library');
@@ -89,8 +89,9 @@ export default function HomePage() {
       <div className="fade-in">
         {view === 'library' && <LibraryView styles={styles} locale={locale} onSelect={(id) => { setSelectedStyleId(id); setView('edit'); }} onCreate={() => setView('create')} onDelete={handleDeleteStyle} />}
         {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
-        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onCompare={() => setView('compare')} showToast={showToast} />}
+        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onCompare={() => setView('compare')} onGenerate={() => setView('generate')} showToast={showToast} />}
         {view === 'compare' && selectedStyle && <CompareView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} />}
+        {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} showToast={showToast} />}
         {view === 'settings' && <SettingsView settings={settings} locale={locale} onBack={() => setView('library')} onSave={handleSettingsSave} showToast={showToast} />}
       </div>
 
@@ -327,13 +328,14 @@ function CreateStyleView({ settings, locale, onBack, onCreate, showToast }: {
 // Edit Style View (Prompt Editor) — with localized field labels
 // ============================================================
 
-function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, showToast }: {
+function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, onGenerate, showToast }: {
   style: StyleLibrary;
   settings: AppSettings;
   locale: Locale;
   onBack: () => void;
   onUpdate: (id: string, updates: Partial<StyleLibrary>) => void;
   onCompare: () => void;
+  onGenerate: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
 }) {
   const [prompt, setPrompt] = useState<PromptSchema>(style.prompt);
@@ -385,6 +387,7 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, s
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div><h1 className="page-title">{style.name}</h1><p className="page-subtitle">{L('edit_subtitle')}</p></div>
         <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn" onClick={onGenerate}>🖼️ {locale === 'vi' ? 'Tạo Ảnh Mới' : 'New Image'}</button>
           <button className="btn" onClick={onCompare}>{L('edit_improve_btn')}</button>
           <button className="btn btn-primary" onClick={handleSave}>{L('edit_save_btn')}</button>
         </div>
@@ -839,6 +842,268 @@ function CompareView({ style, settings, locale, onBack, onUpdate, showToast }: {
               <p style={{ color: 'var(--text-secondary)' }}>{L('compare_no_diff')}</p>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Generate New Image View
+// ============================================================
+
+type VariantField = {
+  group: string;
+  field: string;
+  label_vi: string;
+  label_en: string;
+  hint_vi: string;
+  hint_en: string;
+  placeholder_vi: string;
+  placeholder_en: string;
+  importance: 'required' | 'recommended' | 'optional';
+  input_type: 'text' | 'textarea' | 'tags';
+};
+
+function GenerateView({ style, settings, locale, onBack, showToast }: {
+  style: StyleLibrary;
+  settings: AppSettings;
+  locale: Locale;
+  onBack: () => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+}) {
+  const [detecting, setDetecting] = useState(false);
+  const [styleSummary, setStyleSummary] = useState<string>('');
+  const [variantFields, setVariantFields] = useState<VariantField[]>([]);
+  const [userValues, setUserValues] = useState<Record<string, string | string[]>>({});
+  const [tagInputs, setTagInputs] = useState<Record<string, string>>({});
+  const [resultPrompt, setResultPrompt] = useState<string>('');
+  const [detected, setDetected] = useState(false);
+  const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  // Auto-detect fields on mount
+  useEffect(() => {
+    handleDetect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDetect = async () => {
+    setDetecting(true);
+    setDetected(false);
+    setResultPrompt('');
+    setUserValues({});
+    try {
+      const result = await callAI(settings, 'generateVariant', [], {
+        prompt_context: JSON.stringify(style.prompt, null, 2),
+      });
+      setStyleSummary(result.style_summary || '');
+      setVariantFields(result.variant_fields || []);
+      setDetected(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Detection failed', 'error');
+    } finally {
+      setDetecting(false);
+    }
+  };
+
+  const setValue = (key: string, val: string | string[]) => {
+    setUserValues(prev => ({ ...prev, [key]: val }));
+  };
+
+  const fieldKey = (f: VariantField) => `${f.group}__${f.field}`;
+
+  const handleGenerate = async () => {
+    // Validate required fields
+    const required = variantFields.filter(f => f.importance === 'required');
+    const missing = required.filter(f => {
+      const v = userValues[fieldKey(f)];
+      return !v || (Array.isArray(v) ? v.length === 0 : v.trim() === '');
+    });
+    if (missing.length > 0) {
+      showToast(L('generate_fill_required'), 'warning');
+      return;
+    }
+
+    // Merge user values into the style prompt
+    const variantPrompt = JSON.parse(JSON.stringify(style.prompt)) as Record<string, unknown>;
+
+    variantFields.forEach(f => {
+      const val = userValues[fieldKey(f)];
+      if (!val || (Array.isArray(val) && val.length === 0) || val === '') return;
+      if (!variantPrompt[f.group] || typeof variantPrompt[f.group] !== 'object') return;
+      (variantPrompt[f.group] as Record<string, unknown>)[f.field] = val;
+    });
+
+    // Generate clean JSON prompt (strip nulls)
+    const clean: Record<string, unknown> = {};
+    for (const [gk, gv] of Object.entries(variantPrompt)) {
+      if (gk === 'style_name' || gk === 'version' || gk === 'subject_type') {
+        clean[gk] = gv;
+        continue;
+      }
+      if (gv && typeof gv === 'object' && !Array.isArray(gv)) {
+        const cleanGroup: Record<string, unknown> = {};
+        for (const [fk, fv] of Object.entries(gv as Record<string, unknown>)) {
+          if (fv !== null && fv !== undefined && fv !== '') {
+            if (Array.isArray(fv) && fv.length === 0) continue;
+            cleanGroup[fk] = fv;
+          }
+        }
+        if (Object.keys(cleanGroup).length > 0) clean[gk] = cleanGroup;
+      }
+    }
+    setResultPrompt(JSON.stringify(clean, null, 2));
+  };
+
+  const handleCopy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); showToast(L('edit_copied')); } catch { showToast(L('edit_copy_failed'), 'error'); }
+  };
+
+  const importanceBadge = (imp: string) => {
+    const styles: Record<string, React.CSSProperties> = {
+      required: { background: 'rgba(239,68,68,0.15)', color: 'var(--accent-danger)' },
+      recommended: { background: 'rgba(245,158,11,0.15)', color: 'var(--accent-warning)' },
+      optional: { background: 'rgba(99,102,241,0.12)', color: 'var(--accent-primary)' },
+    };
+    const labels: Record<string, string> = {
+      required: L('generate_required'),
+      recommended: L('generate_recommended'),
+      optional: L('generate_optional'),
+    };
+    return (
+      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.6875rem', fontWeight: 700, ...(styles[imp] || {}) }}>
+        {labels[imp] || imp}
+      </span>
+    );
+  };
+
+  return (
+    <div>
+      <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_editor')}</a>
+      <div className="page-header">
+        <h1 className="page-title">{L('generate_title')} — {style.name}</h1>
+        <p className="page-subtitle">{L('generate_subtitle')}</p>
+      </div>
+
+      {/* Style locked badge */}
+      {style.reference_images.length > 0 && (
+        <div className="image-gallery" style={{ marginBottom: '16px' }}>
+          {style.reference_images.slice(0, 4).map((img, i) => (<div key={i} className="image-thumb"><img src={img} alt={`ref ${i + 1}`} /></div>))}
+        </div>
+      )}
+
+      {styleSummary && (
+        <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-sm)', background: 'rgba(99,102,241,0.08)', borderLeft: '3px solid var(--accent-primary)', marginBottom: '24px', fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
+          <span style={{ color: 'var(--accent-primary)', fontWeight: 600, marginRight: '8px' }}>{L('generate_style_summary')}:</span>
+          {styleSummary}
+        </div>
+      )}
+
+      {detecting && (
+        <div className="analysis-progress slide-in" style={{ marginTop: '8px' }}>
+          <div className="loading-bar"></div>
+          <h3 className="analysis-progress-title" style={{ marginTop: '16px' }}>{L('generate_detecting_title')}</h3>
+          <p className="analysis-progress-desc">{L('generate_detecting_desc')}</p>
+        </div>
+      )}
+
+      {detected && variantFields.length > 0 && !resultPrompt && (
+        <div className="slide-in">
+          {/* Required first */}
+          {(['required', 'recommended', 'optional'] as const).map(imp => {
+            const fields = variantFields.filter(f => f.importance === imp);
+            if (fields.length === 0) return null;
+            return (
+              <div key={imp} style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  {importanceBadge(imp)}
+                  <div style={{ height: '1px', flex: 1, background: 'var(--border-subtle)' }}></div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '12px' }}>
+                  {fields.map(f => {
+                    const key = fieldKey(f);
+                    const label = locale === 'vi' ? f.label_vi : f.label_en;
+                    const hint = locale === 'vi' ? f.hint_vi : f.hint_en;
+                    const placeholder = locale === 'vi' ? f.placeholder_vi : f.placeholder_en;
+                    const value = userValues[key] ?? (f.input_type === 'tags' ? [] : '');
+
+                    return (
+                      <div key={key} className="form-group" style={{ marginBottom: 0, background: 'var(--bg-tertiary)', padding: '14px 16px', borderRadius: 'var(--radius-sm)', border: `1px solid ${imp === 'required' ? 'rgba(239,68,68,0.2)' : 'var(--border-subtle)'}` }}>
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{label}</span>
+                          {importanceBadge(imp)}
+                        </label>
+                        {hint && <div style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)', marginBottom: '6px' }}>{hint}</div>}
+
+                        {f.input_type === 'tags' ? (
+                          <div className="tags-container" onClick={() => document.getElementById(`gen-tag-${key}`)?.focus()}>
+                            {(value as string[]).map((tag, i) => (
+                              <span key={i} className="tag">{tag}
+                                <button className="tag-remove" onClick={() => setValue(key, (value as string[]).filter((_, idx) => idx !== i))}>×</button>
+                              </span>
+                            ))}
+                            <input
+                              id={`gen-tag-${key}`}
+                              className="tags-input"
+                              placeholder={(value as string[]).length === 0 ? placeholder : ''}
+                              value={tagInputs[key] || ''}
+                              onChange={(e) => setTagInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && tagInputs[key]?.trim()) {
+                                  e.preventDefault();
+                                  setValue(key, [...(value as string[]), tagInputs[key].trim()]);
+                                  setTagInputs(prev => ({ ...prev, [key]: '' }));
+                                }
+                                if (e.key === 'Backspace' && !tagInputs[key] && (value as string[]).length > 0) {
+                                  setValue(key, (value as string[]).slice(0, -1));
+                                }
+                              }}
+                            />
+                          </div>
+                        ) : f.input_type === 'textarea' ? (
+                          <textarea
+                            className="form-textarea"
+                            placeholder={placeholder}
+                            value={value as string}
+                            onChange={(e) => setValue(key, e.target.value)}
+                            rows={3}
+                          />
+                        ) : (
+                          <input
+                            className="form-input"
+                            placeholder={placeholder}
+                            value={value as string}
+                            onChange={(e) => setValue(key, e.target.value)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button className="btn btn-primary btn-lg" onClick={handleGenerate}>{L('generate_btn')}</button>
+            <button className="btn btn-lg" onClick={handleDetect}>{locale === 'vi' ? '🔄 Làm mới' : '🔄 Refresh'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Result */}
+      {resultPrompt && (
+        <div className="card slide-in" style={{ marginTop: '8px', border: '1px solid var(--accent-success)', background: 'rgba(16,185,129,0.03)' }}>
+          <div className="card-header">
+            <h3 className="card-title" style={{ color: 'var(--accent-success)' }}>{L('generate_result_title')}</h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn btn-sm btn-primary" onClick={() => handleCopy(resultPrompt)}>{L('generate_copy_prompt')}</button>
+              <button className="btn btn-sm" onClick={() => { setResultPrompt(''); }}>{L('generate_new_variant')}</button>
+            </div>
+          </div>
+          <pre className="prompt-output" style={{ maxHeight: '70vh', overflow: 'auto', fontSize: '0.875rem' }}>
+            {resultPrompt}
+          </pre>
         </div>
       )}
     </div>

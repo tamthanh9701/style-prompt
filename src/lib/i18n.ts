@@ -142,6 +142,24 @@ type TranslationKeys = {
   analysis_summary: string;
   analysis_fields_detected: string;
   analysis_view_edit: string;
+
+  // Generate variant
+  generate_title: string;
+  generate_subtitle: string;
+  generate_btn: string;
+  generate_detecting: string;
+  generate_detecting_title: string;
+  generate_detecting_desc: string;
+  generate_required: string;
+  generate_recommended: string;
+  generate_optional: string;
+  generate_style_locked: string;
+  generate_result_title: string;
+  generate_copy_prompt: string;
+  generate_copy_json: string;
+  generate_new_variant: string;
+  generate_fill_required: string;
+  generate_style_summary: string;
 };
 
 const translations: Record<Locale, TranslationKeys> = {
@@ -258,6 +276,23 @@ const translations: Record<Locale, TranslationKeys> = {
     analysis_summary: 'AI đã phân tích style và tạo prompt có cấu trúc.',
     analysis_fields_detected: 'thông số được phát hiện',
     analysis_view_edit: '📝 Xem & Chỉnh Sửa Prompt',
+
+    generate_title: '🖼️ Tạo Ảnh Mới',
+    generate_subtitle: 'Nhập nội dung variant để tạo ảnh mới cùng style đã phân tích',
+    generate_btn: '✨ Tạo Prompt Cho Ảnh Mới',
+    generate_detecting: 'AI đang phân tích...',
+    generate_detecting_title: 'AI đang xác định các trường cần nhập...',
+    generate_detecting_desc: 'AI sẽ hướng dẫn bạn nhập những thông số cần thiết để tạo ảnh với style này.',
+    generate_required: 'Bắt buộc',
+    generate_recommended: 'Nên có',
+    generate_optional: 'Tùy chọn',
+    generate_style_locked: '🔒 Style cố định (từ phân tích)',
+    generate_result_title: '✅ Prompt Đã Tạo',
+    generate_copy_prompt: '📋 Sao chép JSON Prompt',
+    generate_copy_json: '📋 Sao chép',
+    generate_new_variant: '↩️ Tạo Variant Mới',
+    generate_fill_required: 'Vui lòng điền các trường bắt buộc',
+    generate_style_summary: '🎨 Phong cách đã cố định',
   },
 
   en: {
@@ -373,6 +408,23 @@ const translations: Record<Locale, TranslationKeys> = {
     analysis_summary: 'AI has analyzed the style and generated a structured prompt.',
     analysis_fields_detected: 'fields detected',
     analysis_view_edit: '📝 View & Edit Prompt',
+
+    generate_title: '🖼️ Create New Image',
+    generate_subtitle: 'Enter variant content to create a new image in the same analyzed style',
+    generate_btn: '✨ Generate Prompt for New Image',
+    generate_detecting: 'AI is analyzing...',
+    generate_detecting_title: 'AI is identifying required input fields...',
+    generate_detecting_desc: 'AI will guide you on what to fill in to create a new image in this style.',
+    generate_required: 'Required',
+    generate_recommended: 'Recommended',
+    generate_optional: 'Optional',
+    generate_style_locked: '🔒 Style locked (from analysis)',
+    generate_result_title: '✅ Prompt Generated',
+    generate_copy_prompt: '📋 Copy JSON Prompt',
+    generate_copy_json: '📋 Copy',
+    generate_new_variant: '↩️ Create New Variant',
+    generate_fill_required: 'Please fill in all required fields',
+    generate_style_summary: '🎨 Style locked',
   },
 };
 

@@ -7,7 +7,7 @@ import type { AIProviderType } from '@/types';
 // ============================================================
 
 interface AIRequestBody {
-  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements';
+  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant';
   provider: AIProviderType;
   api_key: string;
   base_url: string;
@@ -199,6 +199,35 @@ Be thorough but practical. Focus on the most impactful differences that would br
 
 const SUGGEST_IMPROVEMENTS_SYSTEM = `You are an expert image prompt engineer. Based on the comparison analysis provided, generate an improved version of the prompt JSON. You MUST respond with ONLY the complete valid JSON prompt object with the suggested improvements applied. Use the same structure as the original prompt but with improved values.`;
 
+const GENERATE_VARIANT_SYSTEM = `You are an expert image prompt engineer. You will receive an existing style prompt JSON that defines a fixed visual style. Your task is to identify which fields a user needs to fill in to create a NEW IMAGE VARIANT that uses the same style but with different content.
+
+Rules:
+1. The STYLE fields (artistic_style, lighting, color_palette, composition, mood_atmosphere, material_texture, technical_quality, camera_lens, post_processing, generation_params, negative_prompt) are FIXED by the style — do NOT include them as inputs.
+2. ONLY include fields that define the CONTENT/SUBJECT that varies per image: subject, subject_character, subject_object, environment.
+3. For each field, determine if it is REQUIRED or OPTIONAL for generating a coherent image.
+4. Generate creative, specific placeholder examples based on the existing style context.
+5. Respond with ONLY a valid JSON object:
+
+{
+  "style_summary": "One sentence describing the fixed style",
+  "variant_fields": [
+    {
+      "group": "subject | subject_character | subject_object | environment",
+      "field": "field_name",
+      "label_vi": "Vietnamese label",
+      "label_en": "English label",
+      "hint_vi": "Short Vietnamese hint explaining what to enter",
+      "hint_en": "Short English hint explaining what to enter",
+      "placeholder_vi": "Vietnamese example value tailored to this style",
+      "placeholder_en": "English example value tailored to this style",
+      "importance": "required | recommended | optional",
+      "input_type": "text | textarea | tags"
+    }
+  ]
+}
+
+Order fields by importance (required first, then recommended, then optional). Limit to maximum 12 fields total.`;
+
 // ============================================================
 // Provider-specific API calls
 // ============================================================
@@ -368,12 +397,15 @@ Compare the generated images against the reference style images and identify all
         if (!body.prompt_context) {
           return NextResponse.json({ error: 'Prompt context is required for improvements' }, { status: 400 });
         }
-        userMessage = `Based on the following comparison analysis and the original prompt, generate an improved version of the full prompt JSON.
+        userMessage = `Based on the following comparison analysis and the original prompt, generate an improved version of the full prompt JSON.\n\nCOMPARISON ANALYSIS AND CURRENT PROMPT:\n${body.prompt_context}\n\nLook at the provided images as reference and generate the improved prompt JSON.`;
+        break;
 
-COMPARISON ANALYSIS AND CURRENT PROMPT:
-${body.prompt_context}
-
-Look at the provided images as reference and generate the improved prompt JSON.`;
+      case 'generateVariant':
+        systemPrompt = GENERATE_VARIANT_SYSTEM;
+        if (!body.prompt_context) {
+          return NextResponse.json({ error: 'Style prompt context is required for variant generation' }, { status: 400 });
+        }
+        userMessage = `Here is the existing style prompt JSON. Analyze it and return the list of variant input fields the user needs to fill in to create a new image with the same style:\n\n${body.prompt_context}`;
         break;
 
       default:
