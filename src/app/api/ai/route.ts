@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { AIProviderType } from '@/types';
 
+// Increase timeout for long AI requests
+export const maxDuration = 120; // seconds
+
 // ============================================================
 // AI Gateway API Route
-// Supports: OpenAI, Anthropic, OpenRouter, LiteLLM
+// Supports: OpenAI, Anthropic, OpenRouter, LiteLLM, Google AI Studio, Vertex AI
 // ============================================================
 
 interface AIRequestBody {

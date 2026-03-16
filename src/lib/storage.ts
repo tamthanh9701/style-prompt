@@ -156,8 +156,22 @@ export async function callAI(
       ...options,
     }),
   });
-
-  const data = await response.json();
+  // Parse response safely — server may return non-JSON (e.g. "Request Entity Too Large")
+  const responseText = await response.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: { result?: any; error?: string; raw?: boolean };
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    const errMsg = responseText.length > 200 ? responseText.slice(0, 200) + '...' : responseText;
+    logger.error('ai_request', `AI response not JSON: ${action}`, {
+      provider: settings.active_provider,
+      status: response.status,
+      responsePreview: errMsg,
+      elapsedMs: elapsed(),
+    });
+    throw new Error(`Server error (${response.status}): ${errMsg}`);
+  }
 
   if (!response.ok) {
     const errMsg = data.error || 'AI request failed';
