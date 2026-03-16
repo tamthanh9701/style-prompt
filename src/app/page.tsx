@@ -1126,18 +1126,19 @@ function SettingsView({ settings, locale, onBack, onSave, showToast }: {
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
-  const providers: Array<{ type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google'; name: string; icon: string }> = [
+  const providers: Array<{ type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai'; name: string; icon: string }> = [
     { type: 'openai', name: 'OpenAI', icon: '🟢' }, { type: 'anthropic', name: 'Anthropic', icon: '🟠' },
     { type: 'openrouter', name: 'OpenRouter', icon: '🔵' }, { type: 'litellm', name: 'LiteLLM', icon: '🟣' },
     { type: 'google', name: 'Google AI Studio', icon: '🔵' },
+    { type: 'vertexai', name: 'Google Vertex AI', icon: '🟡' },
   ];
 
-  const updateProvider = (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google', field: string, value: string) => {
+  const updateProvider = (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai', field: string, value: string) => {
     setLocalSettings(prev => ({ ...prev, providers: { ...prev.providers, [type]: { ...prev.providers[type], [field]: value } } }));
     setTestResults(prev => { const next = { ...prev }; delete next[type]; return next; });
   };
 
-  const handleTestKey = async (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google') => {
+  const handleTestKey = async (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai') => {
     const config = localSettings.providers[type];
     if (!config.api_key) { showToast(L('settings_enter_key'), 'warning'); return; }
     setTestingProvider(type);

@@ -76,6 +76,7 @@ function createDefaultSettings(): AppSettings {
       openrouter: { type: 'openrouter', api_key: '', base_url: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o', enabled: false },
       litellm: { type: 'litellm', api_key: '', base_url: 'http://localhost:4000', model: 'gpt-4o', enabled: false },
       google: { type: 'google', api_key: '', base_url: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash', enabled: false },
+      vertexai: { type: 'vertexai', api_key: '', base_url: 'https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/us-central1', model: 'gemini-2.0-flash', enabled: false },
     },
   };
 }

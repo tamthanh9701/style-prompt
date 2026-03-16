@@ -60,6 +60,31 @@ export async function POST(request: NextRequest) {
         const err = await response.text();
         throw new Error(`${response.status}: ${err.substring(0, 200)}`);
       }
+    } else if (provider === 'vertexai') {
+      // Google Vertex AI — base_url includes project/location path, api_key is Bearer token
+      const base = (base_url || '').replace(/\/$/, '');
+      const testModel = model || 'gemini-2.0-flash';
+      const response = await fetch(
+        `${base}/publishers/google/models/${testModel}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${api_key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'Hi, reply with just "OK"' }] }],
+            generationConfig: { maxOutputTokens: 10 },
+          }),
+        }
+      );
+      if (response.ok) {
+        success = true;
+        message = `Connected to Vertex AI — model: ${testModel}`;
+      } else {
+        const err = await response.text();
+        throw new Error(`${response.status}: ${err.substring(0, 200)}`);
+      }
     } else {
       // OpenAI-compatible (OpenAI, OpenRouter, LiteLLM)
       const response = await fetch(`${base_url}/chat/completions`, {

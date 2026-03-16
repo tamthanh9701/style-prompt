@@ -212,7 +212,7 @@ export interface GeneratedImage {
 // AI Provider Configuration
 // ============================================================
 
-export type AIProviderType = 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google';
+export type AIProviderType = 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai';
 
 export interface AIProviderConfig {
   type: AIProviderType;
@@ -246,6 +246,11 @@ export const DEFAULT_PROVIDERS: Record<AIProviderType, Omit<AIProviderConfig, 'a
   google: {
     type: 'google',
     base_url: 'https://generativelanguage.googleapis.com',
+    model: 'gemini-2.0-flash',
+  },
+  vertexai: {
+    type: 'vertexai',
+    base_url: 'https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/us-central1',
     model: 'gemini-2.0-flash',
   },
 };

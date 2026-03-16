@@ -413,6 +413,71 @@ async function callGemini(
 }
 
 // ============================================================
+// Google Vertex AI provider
+// ============================================================
+
+async function callVertexAI(
+  accessToken: string,
+  baseUrl: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  images: string[]
+): Promise<string> {
+  // baseUrl format: https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT}/locations/{LOCATION}
+  const base = baseUrl.replace(/\/$/, '');
+  const url = `${base}/publishers/google/models/${model}:generateContent`;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parts: any[] = [{ text: userMessage }];
+
+  for (const img of images) {
+    const { base64, mediaType } = extractBase64(img);
+    parts.push({
+      inlineData: {
+        mimeType: mediaType,
+        data: base64,
+      },
+    });
+  }
+
+  const body = {
+    system_instruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 8192,
+    },
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Vertex AI error: ${response.status} - ${error.substring(0, 300)}`);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('No response content from Vertex AI');
+  return text;
+}
+
+// ============================================================
 // Route handler
 // ============================================================
 
@@ -485,6 +550,7 @@ Compare the generated images against the reference style images and identify all
       openrouter: callOpenRouter,
       litellm: callLiteLLM,
       google: callGemini,
+      vertexai: callVertexAI,
     };
 
     const providerFn = callProvider[provider];
