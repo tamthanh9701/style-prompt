@@ -61,15 +61,20 @@ export async function POST(request: NextRequest) {
         throw new Error(`${response.status}: ${err.substring(0, 200)}`);
       }
     } else if (provider === 'vertexai') {
-      // Google Vertex AI — base_url includes project/location path, api_key is Bearer token
+      // Google Vertex AI — supports both Google API Key (AIza*) and OAuth2 Bearer token
       const base = (base_url || '').replace(/\/$/, '');
       const testModel = model || 'gemini-2.0-flash';
+      // Auto-detect auth type: Google API keys start with 'AIza'
+      const isApiKey = api_key.startsWith('AIza');
       const response = await fetch(
         `${base}/publishers/google/models/${testModel}:generateContent`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${api_key}`,
+            ...(isApiKey
+              ? { 'x-goog-api-key': api_key }
+              : { 'Authorization': `Bearer ${api_key}` }
+            ),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
       );
       if (response.ok) {
         success = true;
-        message = `Connected to Vertex AI — model: ${testModel}`;
+        message = `Connected to Vertex AI (${isApiKey ? 'API Key' : 'OAuth2'}) — model: ${testModel}`;
       } else {
         const err = await response.text();
         throw new Error(`${response.status}: ${err.substring(0, 200)}`);

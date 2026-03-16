@@ -460,7 +460,11 @@ async function callVertexAI(
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      // Auto-detect: Google API keys start with 'AIza', everything else is treated as OAuth2 Bearer token
+      ...(accessToken.startsWith('AIza')
+        ? { 'x-goog-api-key': accessToken }
+        : { 'Authorization': `Bearer ${accessToken}` }
+      ),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
