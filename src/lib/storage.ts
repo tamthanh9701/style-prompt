@@ -124,11 +124,24 @@ export async function callAI(
   images: string[],
   options?: { prompt_context?: string; reference_images?: string[] }
 ) {
+  // Lazy-import to avoid SSR issues
+  const { logger, startTimer } = await import('./logger');
   const provider = settings.providers[settings.active_provider];
-  
+
   if (!provider.api_key) {
-    throw new Error(`API key for ${settings.active_provider} is not configured. Go to Settings to add your API key.`);
+    const msg = `API key for ${settings.active_provider} is not configured. Go to Settings to add your API key.`;
+    logger.error('ai_request', msg, { provider: settings.active_provider, action });
+    throw new Error(msg);
   }
+
+  const elapsed = startTimer();
+  logger.info('ai_request', `Starting AI request: ${action}`, {
+    provider: settings.active_provider,
+    model: provider.model,
+    action,
+    imageCount: images.length,
+    hasContext: !!options?.prompt_context,
+  });
 
   const response = await fetch('/api/ai', {
     method: 'POST',
@@ -147,8 +160,25 @@ export async function callAI(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || 'AI request failed');
+    const errMsg = data.error || 'AI request failed';
+    logger.error('ai_request', `AI request failed: ${action}`, {
+      provider: settings.active_provider,
+      model: provider.model,
+      action,
+      status: response.status,
+      error: errMsg,
+      elapsedMs: elapsed(),
+    });
+    throw new Error(errMsg);
   }
+
+  logger.success('ai_request', `AI request succeeded: ${action}`, {
+    provider: settings.active_provider,
+    model: provider.model,
+    action,
+    elapsedMs: elapsed(),
+    resultType: typeof data.result,
+  });
 
   return data.result;
 }

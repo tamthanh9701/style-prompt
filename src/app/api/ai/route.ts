@@ -486,9 +486,21 @@ async function callVertexAI(
 // ============================================================
 
 export async function POST(request: NextRequest) {
+  const reqId = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const start = Date.now();
   try {
     const body: AIRequestBody = await request.json();
     const { action, provider, api_key, base_url, model, images } = body;
+
+    console.log(`\n📡 [AI:${reqId}] REQUEST`, {
+      action,
+      provider,
+      model,
+      imageCount: images?.length ?? 0,
+      hasContext: !!body.prompt_context,
+      keyPrefix: api_key ? api_key.slice(0, 8) + '...' : 'MISSING',
+      baseUrl: base_url,
+    });
 
     if (!api_key) {
       return NextResponse.json({ error: 'API key is required' }, { status: 400 });
@@ -563,6 +575,7 @@ Compare the generated images against the reference style images and identify all
     }
 
     result = await providerFn(api_key, base_url, model, systemPrompt, userMessage, allImages);
+    console.log(`\n✅ [AI:${reqId}] SUCCESS — ${action} in ${Date.now() - start}ms (${result.length} chars)`);
 
     // Try to extract JSON from the response (in case AI wraps it in markdown)
     let jsonResult = result;
@@ -581,7 +594,7 @@ Compare the generated images against the reference style images and identify all
     }
 
   } catch (error) {
-    console.error('AI Gateway error:', error);
+    console.error(`\n❌ [AI:${reqId}] ERROR after ${Date.now() - start}ms:`, error);
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json({ error: message }, { status: 500 });
   }

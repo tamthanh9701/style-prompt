@@ -5,8 +5,17 @@ import { NextRequest, NextResponse } from 'next/server';
 // ============================================================
 
 export async function POST(request: NextRequest) {
+  const start = Date.now();
   try {
     const { provider, api_key, base_url, model } = await request.json();
+
+    console.log(`\n🔑 [TEST-KEY] Request`, {
+      provider,
+      model,
+      baseUrl: base_url,
+      keyPrefix: api_key ? api_key.slice(0, 8) + '...' : 'MISSING',
+      keyLength: api_key?.length ?? 0,
+    });
 
     if (!api_key) {
       return NextResponse.json({ success: false, error: 'API key is required' }, { status: 400 });
@@ -114,9 +123,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log(`\n✅ [TEST-KEY] ${success ? 'SUCCESS' : 'FAILED'} — ${provider} in ${Date.now() - start}ms: ${message}`);
     return NextResponse.json({ success, message });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`\n❌ [TEST-KEY] ERROR after ${Date.now() - start}ms:`, msg);
     return NextResponse.json({ success: false, error: msg }, { status: 200 });
   }
 }
