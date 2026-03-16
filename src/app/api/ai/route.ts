@@ -10,7 +10,7 @@ export const maxDuration = 120; // seconds
 // ============================================================
 
 interface AIRequestBody {
-  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant';
+  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant' | 'variantFromImage';
   provider: AIProviderType;
   api_key: string;
   base_url: string;
@@ -181,32 +181,51 @@ const COMPARE_IMAGES_SYSTEM = `You are an expert image analysis AI. You will be 
 2. Generated images (created from a prompt)
 3. The prompt that was used to generate the images
 
-Your task is to compare the generated images against the reference style images and identify differences. You MUST respond with ONLY a valid JSON object:
+IMPORTANT: You must ONLY compare STYLE-related parameters. Ignore any differences in SUBJECT/CONTENT (what is depicted). The goal is to ensure the generated images match the VISUAL STYLE of the reference images.
+
+STYLE groups to analyze (ONLY these):
+- artistic_style (medium, art_movement, rendering_style, etc.)
+- color_palette (dominant_colors, saturation, contrast, color_grading, etc.)
+- lighting (light_source, direction, quality, shadows, etc.)
+- mood_atmosphere (overall_mood, energy_level, atmosphere_effects, etc.)
+- material_texture (surface_finish, reflectivity, pattern_detail, etc.)
+- technical_quality (resolution, detail_level, sharpness, etc.)
+- camera_lens (lens_type, aperture, film_stock, etc.)
+- post_processing (vignette, bloom_glow, color_filter, grain, etc.)
+
+DO NOT report differences in:
+- subject (main_subject, quantity, subject_details)
+- subject_character (pose, expression, clothing, etc.)
+- subject_object (object_state, brand, etc.)
+- environment (setting, location, weather, time_of_day, etc.)
+- composition (framing, camera_angle, perspective, etc.)
+
+You MUST respond with ONLY a valid JSON object:
 
 {
   "differences": [
     {
-      "category": "string - the prompt group (e.g., lighting, color_palette, composition)",
+      "category": "string - the STYLE group name (e.g., lighting, color_palette)",
       "field": "string - the specific field in that group",
       "current_value": "string|null - what the current prompt produces",
       "suggested_value": "string - what it should be changed to",
       "severity": "minor | moderate | major",
-      "description": "string - explanation of the difference"
+      "description": "string - explanation of the style difference"
     }
   ],
   "similarity_score": number (0-100),
-  "summary": "string - overall analysis summary"
+  "summary": "string - overall STYLE analysis summary (ignore subject differences)"
 }
 
-Be thorough but practical. Focus on the most impactful differences that would bring the generated images closer to the reference style.`;
+Be thorough but practical. Focus on the most impactful STYLE differences that would bring the generated images closer to the reference visual style.`;
 
 const SUGGEST_IMPROVEMENTS_SYSTEM = `You are an expert image prompt engineer. Based on the comparison analysis provided, generate an improved version of the prompt JSON. You MUST respond with ONLY the complete valid JSON prompt object with the suggested improvements applied. Use the same structure as the original prompt but with improved values.`;
 
 const GENERATE_VARIANT_SYSTEM = `You are an expert image prompt engineer. You will receive an existing style prompt JSON that defines a fixed visual style. Your task is to identify which fields a user needs to fill in to create a NEW IMAGE VARIANT that uses the same style but with different content.
 
 Rules:
-1. The STYLE fields (artistic_style, lighting, color_palette, composition, mood_atmosphere, material_texture, technical_quality, camera_lens, post_processing, generation_params, negative_prompt) are FIXED by the style — do NOT include them as inputs.
-2. ONLY include fields that define the CONTENT/SUBJECT that varies per image: subject, subject_character, subject_object, environment.
+1. The STYLE fields (artistic_style, lighting, color_palette, mood_atmosphere, material_texture, technical_quality, camera_lens, post_processing, generation_params, negative_prompt) are FIXED by the style — do NOT include them as inputs.
+2. ONLY include fields that define the CONTENT/SUBJECT that varies per image: subject, subject_character, subject_object, environment, composition.
 3. For each field, determine if it is REQUIRED or OPTIONAL for generating a coherent image.
 4. Generate creative, specific placeholder examples based on the existing style context.
 5. Respond with ONLY a valid JSON object:
@@ -215,7 +234,7 @@ Rules:
   "style_summary": "One sentence describing the fixed style",
   "variant_fields": [
     {
-      "group": "subject | subject_character | subject_object | environment",
+      "group": "subject | subject_character | subject_object | environment | composition",
       "field": "field_name",
       "label_vi": "Vietnamese label",
       "label_en": "English label",
@@ -229,7 +248,46 @@ Rules:
   ]
 }
 
-Order fields by importance (required first, then recommended, then optional). Limit to maximum 12 fields total.`;
+Order fields by importance (required first, then recommended, then optional). Limit to maximum 15 fields total.`;
+
+const VARIANT_FROM_IMAGE_SYSTEM = `You are an expert image analysis AI. You will receive:
+1. An existing style prompt JSON (the fixed visual style)
+2. A reference image from the library
+
+Your task is to analyze the reference image and extract its SUBJECT/CONTENT parameters that can be edited to create a variant. The STYLE parameters are already fixed in the prompt — DO NOT modify them.
+
+SUBJECT groups to extract:
+- subject (main_subject, quantity, subject_details, size_scale, orientation_placement)
+- subject_character (pose_action, expression_emotion, clothing_accessories, body_features, hair_style, age_appearance, ethnicity_skin_tone) — only if subject is a character/person/animal
+- subject_object (object_state, object_condition, brand_label, arrangement_layout, interaction) — only if subject is an object/product
+- environment (setting, location_type, time_of_day, weather, season, era_time_period, background_elements, foreground_elements, ground_surface, sky_description)
+- composition (framing, camera_angle, perspective, depth_of_field, focal_point, composition_rule, symmetry, negative_space, crop_style)
+
+Respond with ONLY a valid JSON object:
+
+{
+  "image_description": "One sentence describing what is shown in the reference image",
+  "extracted_subject": {
+    "subject": { ... filled values from image analysis ... },
+    "subject_character": { ... or null if not applicable ... },
+    "subject_object": { ... or null if not applicable ... },
+    "environment": { ... filled values ... },
+    "composition": { ... filled values ... }
+  },
+  "editable_fields": [
+    {
+      "group": "subject | subject_character | subject_object | environment | composition",
+      "field": "field_name",
+      "current_value": "current value from image",
+      "label_vi": "Vietnamese label",
+      "label_en": "English label",
+      "hint_vi": "Hint on how to modify this",
+      "hint_en": "Hint on how to modify this"
+    }
+  ]
+}
+
+Extract as many relevant details as possible from the image. The user will edit these values to create a new variant with the same style.`;
 
 // ============================================================
 // Provider-specific API calls
@@ -555,6 +613,14 @@ Compare the generated images against the reference style images and identify all
           return NextResponse.json({ error: 'Style prompt context is required for variant generation' }, { status: 400 });
         }
         userMessage = `Here is the existing style prompt JSON. Analyze it and return the list of variant input fields the user needs to fill in to create a new image with the same style:\n\n${body.prompt_context}`;
+        break;
+
+      case 'variantFromImage':
+        systemPrompt = VARIANT_FROM_IMAGE_SYSTEM;
+        if (!body.prompt_context) {
+          return NextResponse.json({ error: 'Style prompt context is required for variant from image' }, { status: 400 });
+        }
+        userMessage = `Here is the fixed style prompt JSON:\n\n${body.prompt_context}\n\nAnalyze the provided image and extract its SUBJECT/CONTENT parameters. The user will edit these to create a variant with the same style.`;
         break;
 
       default:

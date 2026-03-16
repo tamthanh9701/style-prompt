@@ -447,6 +447,40 @@ export function createEmptyPrompt(name: string = 'Untitled Style', type: Subject
 }
 
 // ============================================================
+// Style vs Subject Classification
+// ============================================================
+// STYLE groups: Fixed parameters that define the visual style
+// SUBJECT groups: Variable parameters that define image content
+
+export const STYLE_GROUPS: (keyof PromptSchema)[] = [
+  'artistic_style',
+  'color_palette',
+  'lighting',
+  'mood_atmosphere',
+  'material_texture',
+  'technical_quality',
+  'camera_lens',
+  'post_processing',
+  'negative_prompt',
+  'generation_params',
+];
+
+export const SUBJECT_GROUPS: (keyof PromptSchema)[] = [
+  'subject',
+  'subject_character',
+  'subject_object',
+  'environment',
+  'composition',
+];
+
+// Helper to check if a group belongs to Style or Subject
+export function getGroupCategory(groupKey: keyof PromptSchema): 'style' | 'subject' | 'meta' {
+  if (STYLE_GROUPS.includes(groupKey)) return 'style';
+  if (SUBJECT_GROUPS.includes(groupKey)) return 'subject';
+  return 'meta'; // style_name, version, subject_type
+}
+
+// ============================================================
 // Utility: Flatten prompt to text
 // ============================================================
 

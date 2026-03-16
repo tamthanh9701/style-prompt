@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { StyleLibrary, AppSettings, PromptSchema } from '@/types';
-import { createEmptyPrompt, flattenPrompt, generateJsonPrompt, PROMPT_GROUPS } from '@/types';
+import { createEmptyPrompt, flattenPrompt, generateJsonPrompt, PROMPT_GROUPS, STYLE_GROUPS, SUBJECT_GROUPS, getGroupCategory } from '@/types';
 import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings, fileToBase64, generateId, callAI } from '@/lib/storage';
 import { type Locale, getLocale, setLocale as persistLocale, t, getGroupLabel, getFieldLabel } from '@/lib/i18n';
 
@@ -343,6 +343,7 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, o
   const [prompt, setPrompt] = useState<PromptSchema>(style.prompt);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ subject: true, artistic_style: true });
   const [activeTab, setActiveTab] = useState<'editor' | 'output' | 'json'>('editor');
+  const [editorFilter, setEditorFilter] = useState<'all' | 'style' | 'subject'>('all');
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
   const flattened = flattenPrompt(prompt);
@@ -420,8 +421,30 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, o
               </div>
             </div>
 
+            {/* Style / Subject sub-filter */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+              <button className={`btn btn-sm ${editorFilter === 'all' ? 'btn-primary' : ''}`}
+                onClick={() => setEditorFilter('all')} style={{ fontSize: '0.8125rem' }}>
+                {locale === 'vi' ? 'Tất cả' : 'All'}
+              </button>
+              <button className={`btn btn-sm ${editorFilter === 'style' ? 'btn-primary' : ''}`}
+                onClick={() => setEditorFilter('style')} style={{ fontSize: '0.8125rem' }}>
+                🎨 {locale === 'vi' ? 'Style' : 'Style'} ({STYLE_GROUPS.length})
+              </button>
+              <button className={`btn btn-sm ${editorFilter === 'subject' ? 'btn-primary' : ''}`}
+                onClick={() => setEditorFilter('subject')} style={{ fontSize: '0.8125rem' }}>
+                🧩 {locale === 'vi' ? 'Chủ thể' : 'Subject'} ({SUBJECT_GROUPS.length})
+              </button>
+            </div>
+
             {PROMPT_GROUPS.map((group) => {
               if (group.condition && !group.condition(prompt)) return null;
+
+              // Filter by Style/Subject category
+              const category = getGroupCategory(group.key as keyof PromptSchema);
+              if (editorFilter === 'style' && category !== 'style') return null;
+              if (editorFilter === 'subject' && category !== 'subject') return null;
+
               const groupData = (prompt as unknown as Record<string, Record<string, unknown>>)[group.key] as Record<string, unknown> | null;
               if (!groupData) return null;
 
@@ -445,6 +468,13 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, o
                     <div className="section-info">
                       <div className="section-label">
                         {groupLabel}
+                        <span style={{
+                          fontSize: '0.625rem', fontWeight: 600, padding: '1px 6px', borderRadius: '8px', marginLeft: '8px',
+                          background: category === 'style' ? 'rgba(139,92,246,0.15)' : 'rgba(59,130,246,0.15)',
+                          color: category === 'style' ? 'rgb(167,139,250)' : 'rgb(96,165,250)',
+                        }}>
+                          {category === 'style' ? '🎨 STYLE' : '🧩 SUBJECT'}
+                        </span>
                         {filledCount > 0 && (<span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', marginLeft: '8px', fontWeight: 400 }}>{filledCount} {L('edit_fields')}</span>)}
                       </div>
                       <div className="section-desc">{groupDesc}</div>
