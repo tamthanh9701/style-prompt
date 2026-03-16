@@ -56,7 +56,23 @@ export function getSettings(): AppSettings {
   }
   try {
     const data = localStorage.getItem(SETTINGS_KEY);
-    return data ? JSON.parse(data) : createDefaultSettings();
+    if (!data) return createDefaultSettings();
+
+    const saved: AppSettings = JSON.parse(data);
+    const defaults = createDefaultSettings();
+
+    // Merge: ensure every provider from defaults exists in saved settings
+    // This handles the case where new providers are added to the app after the user already saved settings
+    const mergedProviders = { ...defaults.providers };
+    for (const key of Object.keys(saved.providers) as Array<keyof typeof saved.providers>) {
+      mergedProviders[key] = { ...defaults.providers[key], ...saved.providers[key] };
+    }
+
+    return {
+      ...defaults,
+      ...saved,
+      providers: mergedProviders,
+    };
   } catch {
     return createDefaultSettings();
   }
