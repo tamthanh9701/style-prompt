@@ -212,7 +212,7 @@ export interface GeneratedImage {
 // AI Provider Configuration
 // ============================================================
 
-export type AIProviderType = 'openai' | 'anthropic' | 'openrouter' | 'litellm';
+export type AIProviderType = 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google';
 
 export interface AIProviderConfig {
   type: AIProviderType;
@@ -242,6 +242,11 @@ export const DEFAULT_PROVIDERS: Record<AIProviderType, Omit<AIProviderConfig, 'a
     type: 'litellm',
     base_url: 'http://localhost:4000',
     model: 'gpt-4o',
+  },
+  google: {
+    type: 'google',
+    base_url: 'https://generativelanguage.googleapis.com',
+    model: 'gemini-2.0-flash',
   },
 };
 

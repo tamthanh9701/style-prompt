@@ -75,6 +75,7 @@ function createDefaultSettings(): AppSettings {
       anthropic: { type: 'anthropic', api_key: '', base_url: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514', enabled: false },
       openrouter: { type: 'openrouter', api_key: '', base_url: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o', enabled: false },
       litellm: { type: 'litellm', api_key: '', base_url: 'http://localhost:4000', model: 'gpt-4o', enabled: false },
+      google: { type: 'google', api_key: '', base_url: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash', enabled: false },
     },
   };
 }

@@ -351,6 +351,68 @@ async function callLiteLLM(
 }
 
 // ============================================================
+// Google AI Studio (Gemini) provider
+// ============================================================
+
+async function callGemini(
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  images: string[]
+): Promise<string> {
+  const base = baseUrl || 'https://generativelanguage.googleapis.com';
+  const url = `${base}/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  // Build parts: text first, then images
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parts: any[] = [{ text: userMessage }];
+
+  for (const img of images) {
+    const { base64, mediaType } = extractBase64(img);
+    parts.push({
+      inlineData: {
+        mimeType: mediaType,
+        data: base64,
+      },
+    });
+  }
+
+  const body = {
+    system_instruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 8192,
+    },
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Google AI Studio error: ${response.status} - ${error.substring(0, 300)}`);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('No response content from Gemini');
+  return text;
+}
+
+// ============================================================
 // Route handler
 // ============================================================
 
@@ -364,7 +426,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!images || images.length === 0) {
-      return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
+      // generateVariant and suggestImprovements don't require images
+      if (action !== 'generateVariant' && action !== 'suggestImprovements') {
+        return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
+      }
     }
 
     let systemPrompt: string;
@@ -414,11 +479,12 @@ Compare the generated images against the reference style images and identify all
 
     let result: string;
 
-    const callProvider = {
+    const callProvider: Record<string, typeof callOpenAI> = {
       openai: callOpenAI,
       anthropic: callAnthropic,
       openrouter: callOpenRouter,
       litellm: callLiteLLM,
+      google: callGemini,
     };
 
     const providerFn = callProvider[provider];
