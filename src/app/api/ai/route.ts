@@ -18,6 +18,10 @@ interface AIRequestBody {
   images: string[]; // base64 data URLs
   prompt_context?: string; // existing prompt JSON for comparison
   reference_images?: string[]; // reference style images for comparison
+  // Vertex AI specific
+  vertex_project?: string;
+  vertex_location?: string;
+  vertex_credentials?: string; // Service account JSON string
 }
 
 // Convert base64 data URL to the format needed by each provider
@@ -474,20 +478,134 @@ async function callGemini(
 }
 
 // ============================================================
-// Google Vertex AI provider
+// Google Vertex AI provider + Service Account JWT Auth
 // ============================================================
 
+// Base64url encode for JWT
+function base64url(data: ArrayBuffer | Uint8Array | string): string {
+  let bytes: Uint8Array;
+  if (typeof data === 'string') {
+    bytes = new TextEncoder().encode(data);
+  } else if (data instanceof ArrayBuffer) {
+    bytes = new Uint8Array(data);
+  } else {
+    bytes = data;
+  }
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Import PKCS8 PEM private key for RS256 signing
+async function importPrivateKey(pem: string): Promise<CryptoKey> {
+  const pemBody = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
+  const binaryDer = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+  return crypto.subtle.importKey(
+    'pkcs8',
+    binaryDer.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+}
+
+// Generate OAuth2 access token from service account credentials JSON
+async function getAccessTokenFromCredentials(credentialsJson: string): Promise<string> {
+  const creds = JSON.parse(credentialsJson);
+  const { client_email, private_key, token_uri } = creds;
+
+  if (!client_email || !private_key) {
+    throw new Error('Invalid credentials: missing client_email or private_key');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: client_email,
+    scope: 'https://www.googleapis.com/auth/cloud-platform',
+    aud: token_uri || 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const headerB64 = base64url(JSON.stringify(header));
+  const payloadB64 = base64url(JSON.stringify(payload));
+  const signingInput = `${headerB64}.${payloadB64}`;
+
+  const key = await importPrivateKey(private_key);
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    new TextEncoder().encode(signingInput)
+  );
+
+  const jwt = `${signingInput}.${base64url(signature)}`;
+
+  // Exchange JWT for access token
+  const tokenResponse = await fetch(token_uri || 'https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+
+  if (!tokenResponse.ok) {
+    const err = await tokenResponse.text();
+    throw new Error(`Token exchange failed: ${tokenResponse.status} - ${err.substring(0, 200)}`);
+  }
+
+  const tokenData = await tokenResponse.json();
+  return tokenData.access_token;
+}
+
+// Resolve Vertex AI auth: credentials JSON → OAuth2 token, or use API key / manual Bearer token
+async function resolveVertexAuth(
+  apiKey: string,
+  credentials?: string
+): Promise<{ authHeader: Record<string, string> }> {
+  // Priority 1: Service account credentials
+  if (credentials && credentials.trim().startsWith('{')) {
+    console.log('[VERTEX] Using service account credentials for auth');
+    const accessToken = await getAccessTokenFromCredentials(credentials);
+    return { authHeader: { 'Authorization': `Bearer ${accessToken}` } };
+  }
+
+  // Priority 2: API key (starts with AIza)
+  if (apiKey.startsWith('AIza')) {
+    console.log('[VERTEX] Using Google API key for auth');
+    return { authHeader: { 'x-goog-api-key': apiKey } };
+  }
+
+  // Priority 3: Manual Bearer token
+  console.log('[VERTEX] Using manual Bearer token for auth');
+  return { authHeader: { 'Authorization': `Bearer ${apiKey}` } };
+}
+
+// Build Vertex AI URL from project + location, or use manual base_url
+function buildVertexUrl(baseUrl: string, project?: string, location?: string, model?: string): string {
+  if (baseUrl && baseUrl.includes('aiplatform.googleapis.com')) {
+    // Manual base_url provided — use it directly
+    return `${baseUrl.replace(/\/$/, '')}/publishers/google/models/${model}:generateContent`;
+  }
+  // Auto-construct from project + location
+  const loc = location || 'us-central1';
+  if (!project) throw new Error('Vertex AI: project_id is required (set in Settings → Vertex Project)');
+  return `https://${loc}-aiplatform.googleapis.com/v1/projects/${project}/locations/${loc}/publishers/google/models/${model}:generateContent`;
+}
+
 async function callVertexAI(
-  accessToken: string,
+  apiKey: string,
   baseUrl: string,
   model: string,
   systemPrompt: string,
   userMessage: string,
-  images: string[]
+  images: string[],
+  options?: { vertex_project?: string; vertex_location?: string; vertex_credentials?: string }
 ): Promise<string> {
-  // baseUrl format: https://{LOCATION}-aiplatform.googleapis.com/v1/projects/{PROJECT}/locations/{LOCATION}
-  const base = baseUrl.replace(/\/$/, '');
-  const url = `${base}/publishers/google/models/${model}:generateContent`;
+  const url = buildVertexUrl(baseUrl, options?.vertex_project, options?.vertex_location, model);
+  const { authHeader } = await resolveVertexAuth(apiKey, options?.vertex_credentials);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parts: any[] = [{ text: userMessage }];
@@ -518,14 +636,12 @@ async function callVertexAI(
     },
   };
 
+  console.log(`[VERTEX] Calling ${url.substring(0, 80)}...`);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      // Auto-detect: Google API keys start with 'AIza', everything else is treated as OAuth2 Bearer token
-      ...(accessToken.startsWith('AIza')
-        ? { 'x-goog-api-key': accessToken }
-        : { 'Authorization': `Bearer ${accessToken}` }
-      ),
+      ...authHeader,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -563,12 +679,12 @@ export async function POST(request: NextRequest) {
       baseUrl: base_url,
     });
 
-    if (!api_key) {
+    if (!api_key && !(provider === 'vertexai' && body.vertex_credentials)) {
       return NextResponse.json({ error: 'API key is required' }, { status: 400 });
     }
 
     if (!images || images.length === 0) {
-      // generateVariant and suggestImprovements don't require images
+      // generateVariant, suggestImprovements, variantFromImage may not require images
       if (action !== 'generateVariant' && action !== 'suggestImprovements') {
         return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
       }
@@ -629,21 +745,29 @@ Compare the generated images against the reference style images and identify all
 
     let result: string;
 
-    const callProvider: Record<string, typeof callOpenAI> = {
-      openai: callOpenAI,
-      anthropic: callAnthropic,
-      openrouter: callOpenRouter,
-      litellm: callLiteLLM,
-      google: callGemini,
-      vertexai: callVertexAI,
-    };
+    // Vertex AI needs special handling for credentials
+    if (provider === 'vertexai') {
+      result = await callVertexAI(api_key || '', base_url, model, systemPrompt, userMessage, allImages, {
+        vertex_project: body.vertex_project,
+        vertex_location: body.vertex_location,
+        vertex_credentials: body.vertex_credentials,
+      });
+    } else {
+      const callProvider: Record<string, typeof callOpenAI> = {
+        openai: callOpenAI,
+        anthropic: callAnthropic,
+        openrouter: callOpenRouter,
+        litellm: callLiteLLM,
+        google: callGemini,
+      };
 
-    const providerFn = callProvider[provider];
-    if (!providerFn) {
-      return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 });
+      const providerFn = callProvider[provider];
+      if (!providerFn) {
+        return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 });
+      }
+
+      result = await providerFn(api_key, base_url, model, systemPrompt, userMessage, allImages);
     }
-
-    result = await providerFn(api_key, base_url, model, systemPrompt, userMessage, allImages);
     console.log(`\n✅ [AI:${reqId}] SUCCESS — ${action} in ${Date.now() - start}ms (${result.length} chars)`);
 
     // Try to extract JSON from the response (in case AI wraps it in markdown)

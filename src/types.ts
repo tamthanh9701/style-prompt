@@ -220,6 +220,10 @@ export interface AIProviderConfig {
   base_url: string;
   model: string;
   enabled: boolean;
+  // Vertex AI specific
+  vertex_project?: string;
+  vertex_location?: string;
+  vertex_credentials?: string; // Service account JSON string
 }
 
 export const DEFAULT_PROVIDERS: Record<AIProviderType, Omit<AIProviderConfig, 'api_key' | 'enabled'>> = {
@@ -250,7 +254,7 @@ export const DEFAULT_PROVIDERS: Record<AIProviderType, Omit<AIProviderConfig, 'a
   },
   vertexai: {
     type: 'vertexai',
-    base_url: 'https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/us-central1',
+    base_url: '',
     model: 'gemini-2.0-flash',
   },
 };

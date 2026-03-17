@@ -1371,7 +1371,9 @@ function SettingsView({ settings, locale, onBack, onSave, showToast }: {
 
   const handleTestKey = async (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai') => {
     const config = localSettings.providers[type];
-    if (!config.api_key) { showToast(L('settings_enter_key'), 'warning'); return; }
+    if (!config.api_key && !(type === 'vertexai' && config.vertex_credentials)) {
+      showToast(L('settings_enter_key'), 'warning'); return;
+    }
     setTestingProvider(type);
 
     // Log test start
@@ -1381,14 +1383,24 @@ function SettingsView({ settings, locale, onBack, onSave, showToast }: {
       provider: type,
       model: config.model,
       baseUrl: config.base_url,
-      keyPrefix: config.api_key.slice(0, 8) + '...',
-      keyLength: config.api_key.length,
+      keyPrefix: config.api_key ? config.api_key.slice(0, 8) + '...' : 'NONE',
+      hasCredentials: !!config.vertex_credentials,
     });
 
     try {
       const response = await fetch('/api/test-key', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: type, api_key: config.api_key, base_url: config.base_url, model: config.model }),
+        body: JSON.stringify({
+          provider: type,
+          api_key: config.api_key,
+          base_url: config.base_url,
+          model: config.model,
+          ...(type === 'vertexai' ? {
+            vertex_project: config.vertex_project,
+            vertex_location: config.vertex_location,
+            vertex_credentials: config.vertex_credentials,
+          } : {}),
+        }),
       });
       const data = await response.json();
       if (data.success) {
@@ -1443,8 +1455,70 @@ function SettingsView({ settings, locale, onBack, onSave, showToast }: {
             <div key={p.type} className={`card provider-card ${isActive ? 'active' : ''}`}>
               {isActive && <span className="provider-badge active">✓ Active</span>}
               <h3 className="card-title" style={{ marginBottom: '16px' }}>{p.icon} {p.name}</h3>
-              <div className="form-group"><label className="form-label">{L('settings_api_key')}</label><input className="form-input" type="password" placeholder={`${p.name} API key...`} value={config.api_key} onChange={(e) => updateProvider(p.type, 'api_key', e.target.value)} /></div>
-              <div className="form-group"><label className="form-label">{L('settings_base_url')}</label><input className="form-input" placeholder="API base URL" value={config.base_url} onChange={(e) => updateProvider(p.type, 'base_url', e.target.value)} /></div>
+
+              {/* Vertex AI: Project + Location */}
+              {p.type === 'vertexai' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">{locale === 'vi' ? 'Vertex Project *' : 'Vertex Project *'}</label>
+                    <input className="form-input" placeholder="my-gcp-project-id" value={config.vertex_project || ''} onChange={(e) => updateProvider(p.type, 'vertex_project', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{locale === 'vi' ? 'Vertex Location' : 'Vertex Location'}</label>
+                    <input className="form-input" placeholder="us-central1" value={config.vertex_location || ''} onChange={(e) => updateProvider(p.type, 'vertex_location', e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {/* API Key — optional label for Vertex AI */}
+              <div className="form-group">
+                <label className="form-label">
+                  {L('settings_api_key')}{p.type === 'vertexai' ? <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>{locale === 'vi' ? '(tùy chọn nếu dùng Credentials)' : '(optional if using Credentials)'}</span> : null}
+                </label>
+                <input className="form-input" type="password" placeholder={p.type === 'vertexai' ? 'AIza... or OAuth2 token (optional)' : `${p.name} API key...`} value={config.api_key} onChange={(e) => updateProvider(p.type, 'api_key', e.target.value)} />
+              </div>
+
+              {/* Vertex AI: Credentials JSON upload */}
+              {p.type === 'vertexai' && (
+                <div className="form-group">
+                  <label className="form-label">
+                    {locale === 'vi' ? 'Vertex Credentials' : 'Vertex Credentials'}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>{locale === 'vi' ? '(file JSON service account)' : '(service account .json file)'}</span>
+                  </label>
+                  {config.vertex_credentials ? (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{
+                        flex: 1, padding: '8px 12px', borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+                        fontSize: '0.8125rem', color: 'var(--accent-success)',
+                      }}>
+                        ✅ {(() => { try { return JSON.parse(config.vertex_credentials).client_email || 'Credentials loaded'; } catch { return 'Credentials loaded'; } })()}
+                      </div>
+                      <button className="btn btn-sm" style={{ color: 'var(--accent-danger)' }} onClick={() => updateProvider(p.type, 'vertex_credentials', '')}>
+                        🗑️
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="btn btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      📁 {locale === 'vi' ? 'Tải lên file .json' : 'Upload .json file'}
+                      <input type="file" accept=".json" style={{ display: 'none' }} onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const text = await file.text();
+                          JSON.parse(text); // validate JSON
+                          updateProvider(p.type, 'vertex_credentials', text);
+                          showToast(locale === 'vi' ? 'Đã tải credentials thành công!' : 'Credentials loaded successfully!');
+                        } catch {
+                          showToast(locale === 'vi' ? 'File JSON không hợp lệ' : 'Invalid JSON file', 'error');
+                        }
+                      }} />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              <div className="form-group"><label className="form-label">{L('settings_base_url')}</label><input className="form-input" placeholder={p.type === 'vertexai' ? (locale === 'vi' ? 'Tự động từ Project + Location' : 'Auto from Project + Location') : 'API base URL'} value={config.base_url} onChange={(e) => updateProvider(p.type, 'base_url', e.target.value)} /></div>
               <div className="form-group"><label className="form-label">{L('settings_model')}</label><input className="form-input" placeholder="Model name" value={config.model} onChange={(e) => updateProvider(p.type, 'model', e.target.value)} /></div>
               <button className={`btn btn-sm ${testResult?.success ? 'btn-success' : ''}`} onClick={() => handleTestKey(p.type)} disabled={isTesting} style={{ width: '100%' }}>
                 {isTesting ? <><span className="loading-spinner"></span> {L('settings_testing')}</> : testResult ? (testResult.success ? L('settings_test_ok') : `❌ ${L('settings_test_btn')}`) : L('settings_test_btn')}

@@ -92,7 +92,7 @@ function createDefaultSettings(): AppSettings {
       openrouter: { type: 'openrouter', api_key: '', base_url: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o', enabled: false },
       litellm: { type: 'litellm', api_key: '', base_url: 'http://localhost:4000', model: 'gpt-4o', enabled: false },
       google: { type: 'google', api_key: '', base_url: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash', enabled: false },
-      vertexai: { type: 'vertexai', api_key: '', base_url: 'https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT_ID/locations/us-central1', model: 'gemini-2.0-flash', enabled: false },
+      vertexai: { type: 'vertexai', api_key: '', base_url: '', model: 'gemini-2.0-flash', enabled: false, vertex_project: '', vertex_location: 'us-central1', vertex_credentials: '' },
     },
   };
 }
@@ -128,7 +128,7 @@ export async function callAI(
   const { logger, startTimer } = await import('./logger');
   const provider = settings.providers[settings.active_provider];
 
-  if (!provider.api_key) {
+  if (!provider.api_key && !(settings.active_provider === 'vertexai' && provider.vertex_credentials)) {
     const msg = `API key for ${settings.active_provider} is not configured. Go to Settings to add your API key.`;
     logger.error('ai_request', msg, { provider: settings.active_provider, action });
     throw new Error(msg);
@@ -153,6 +153,12 @@ export async function callAI(
       base_url: provider.base_url,
       model: provider.model,
       images,
+      // Vertex AI specific
+      ...(settings.active_provider === 'vertexai' ? {
+        vertex_project: provider.vertex_project,
+        vertex_location: provider.vertex_location,
+        vertex_credentials: provider.vertex_credentials,
+      } : {}),
       ...options,
     }),
   });
