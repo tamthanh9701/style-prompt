@@ -223,7 +223,11 @@ You MUST respond with ONLY a valid JSON object:
 
 Be thorough but practical. Focus on the most impactful STYLE differences that would bring the generated images closer to the reference visual style.`;
 
-const SUGGEST_IMPROVEMENTS_SYSTEM = `You are an expert image prompt engineer. Based on the comparison analysis provided, generate an improved version of the prompt JSON. You MUST respond with ONLY the complete valid JSON prompt object with the suggested improvements applied. Use the same structure as the original prompt but with improved values.`;
+const SUGGEST_IMPROVEMENTS_SYSTEM = `You are an expert image prompt engineer. Based on the comparison analysis provided, generate an improved version of the prompt JSON. You MUST respond with ONLY the complete valid JSON prompt object with the suggested improvements applied. Use the same structure as the original prompt but with improved values.
+
+IMPORTANT: Only modify STYLE-related fields (artistic_style, color_palette, lighting, mood_atmosphere, material_texture, technical_quality, camera_lens, post_processing, negative_prompt, generation_params). Keep SUBJECT fields unchanged.
+
+If user_feedback is provided, prioritize the user's specific requests when making improvements. The user knows best what they want to achieve.`;
 
 const GENERATE_VARIANT_SYSTEM = `You are an expert image prompt engineer. You will receive an existing style prompt JSON that defines a fixed visual style. Your task is to identify which fields a user needs to fill in to create a NEW IMAGE VARIANT that uses the same style but with different content.
 

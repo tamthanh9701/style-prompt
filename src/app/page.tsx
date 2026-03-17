@@ -92,7 +92,7 @@ export default function HomePage() {
         {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
         {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onCompare={() => setView('compare')} onGenerate={() => setView('generate')} showToast={showToast} />}
         {view === 'compare' && selectedStyle && <CompareView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} />}
-        {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} showToast={showToast} />}
+        {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} />}
         {view === 'logs' && <LogsView locale={locale} onBack={() => setView('library')} />}
         {view === 'settings' && <SettingsView settings={settings} locale={locale} onBack={() => setView('library')} onSave={handleSettingsSave} showToast={showToast} />}
       </div>
@@ -642,6 +642,7 @@ function CompareView({ style, settings, locale, onBack, onUpdate, showToast }: {
   const [suggestedPrompt, setSuggestedPrompt] = useState<PromptSchema | null>(null);
   const [selectedDiffs, setSelectedDiffs] = useState<Record<number, boolean>>({});
   const [dragOver, setDragOver] = useState(false);
+  const [userFeedback, setUserFeedback] = useState<string>('');
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
   const handleFiles = async (files: FileList | File[]) => {
@@ -671,9 +672,16 @@ function CompareView({ style, settings, locale, onBack, onUpdate, showToast }: {
       }
       setSelectedDiffs(defaultSelected);
 
-      // Step 2: Get suggested improvements
+      // Step 2: Get suggested improvements (include user feedback if provided)
+      const improvementContext: Record<string, unknown> = {
+        comparison: compResult,
+        current_prompt: style.prompt,
+      };
+      if (userFeedback.trim()) {
+        improvementContext.user_feedback = userFeedback.trim();
+      }
       const improved = await callAI(settings, 'suggestImprovements', style.reference_images, {
-        prompt_context: JSON.stringify({ comparison: compResult, current_prompt: style.prompt }, null, 2),
+        prompt_context: JSON.stringify(improvementContext, null, 2),
       });
       setSuggestedPrompt(improved);
     } catch (error) {
@@ -767,6 +775,31 @@ function CompareView({ style, settings, locale, onBack, onUpdate, showToast }: {
           {comparing ? <><span className="loading-spinner"></span> {L('compare_analyzing')}</> : <>{L('compare_btn')}</>}
         </button>
       </div>
+
+      {/* User Feedback — shown after results for re-improvement */}
+      {comparison && (
+        <div className="card" style={{ marginTop: '20px' }}>
+          <div className="card-header">
+            <h3 className="card-title">💬 {locale === 'vi' ? 'Phản hồi của bạn' : 'Your Feedback'}</h3>
+          </div>
+          <textarea
+            className="form-textarea"
+            value={userFeedback}
+            onChange={(e) => setUserFeedback(e.target.value)}
+            rows={3}
+            placeholder={locale === 'vi'
+              ? 'Nhập phản hồi để cải thiện kết quả, VD: "Tôi muốn màu sắc ấm hơn" hoặc "Ánh sáng cần mềm mại hơn"...'
+              : 'Enter feedback to improve results, e.g. "I want warmer colors" or "Lighting needs to be softer"...'}
+          />
+          {userFeedback.trim() && (
+            <div style={{ marginTop: '8px', textAlign: 'right' }}>
+              <button className="btn btn-sm btn-primary" onClick={handleCompare} disabled={comparing}>
+                {comparing ? <><span className="loading-spinner"></span></> : <>{locale === 'vi' ? '🔄 Phân tích lại với phản hồi' : '🔄 Re-analyze with feedback'}</>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {comparing && (
         <div className="analysis-progress slide-in" style={{ marginTop: '24px' }}>
@@ -897,11 +930,12 @@ type VariantField = {
   input_type: 'text' | 'textarea' | 'tags';
 };
 
-function GenerateView({ style, settings, locale, onBack, showToast }: {
+function GenerateView({ style, settings, locale, onBack, onUpdate, showToast }: {
   style: StyleLibrary;
   settings: AppSettings;
   locale: Locale;
   onBack: () => void;
+  onUpdate: (id: string, updates: Partial<StyleLibrary>) => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
 }) {
   const [detecting, setDetecting] = useState(false);
@@ -911,11 +945,20 @@ function GenerateView({ style, settings, locale, onBack, showToast }: {
   const [tagInputs, setTagInputs] = useState<Record<string, string>>({});
   const [resultPrompt, setResultPrompt] = useState<string>('');
   const [detected, setDetected] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
-  // Auto-detect fields on mount
+  // Load cached fields or auto-detect on mount
   useEffect(() => {
-    handleDetect();
+    if (style.cached_variant_fields && style.cached_variant_fields.fields.length > 0) {
+      // Use cached results — instant, no AI call needed
+      setStyleSummary(style.cached_variant_fields.style_summary);
+      setVariantFields(style.cached_variant_fields.fields as VariantField[]);
+      setDetected(true);
+      setFromCache(true);
+    } else {
+      handleDetect();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -924,6 +967,7 @@ function GenerateView({ style, settings, locale, onBack, showToast }: {
     setDetected(false);
     setResultPrompt('');
     setUserValues({});
+    setFromCache(false);
     try {
       const result = await callAI(settings, 'generateVariant', [], {
         prompt_context: JSON.stringify(style.prompt, null, 2),
@@ -931,6 +975,15 @@ function GenerateView({ style, settings, locale, onBack, showToast }: {
       setStyleSummary(result.style_summary || '');
       setVariantFields(result.variant_fields || []);
       setDetected(true);
+
+      // Save to cache for next time
+      onUpdate(style.id, {
+        cached_variant_fields: {
+          style_summary: result.style_summary || '',
+          fields: result.variant_fields || [],
+          detected_at: new Date().toISOString(),
+        },
+      });
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Detection failed', 'error');
     } finally {
@@ -1012,9 +1065,23 @@ function GenerateView({ style, settings, locale, onBack, showToast }: {
   return (
     <div>
       <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_editor')}</a>
-      <div className="page-header">
-        <h1 className="page-title">{L('generate_title')} — {style.name}</h1>
-        <p className="page-subtitle">{L('generate_subtitle')}</p>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 className="page-title">{L('generate_title')} — {style.name}</h1>
+          <p className="page-subtitle">{L('generate_subtitle')}</p>
+        </div>
+        {detected && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {fromCache && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '4px 10px', borderRadius: '12px', background: 'rgba(99,102,241,0.08)' }}>
+                ⚡ {locale === 'vi' ? 'Từ bộ nhớ đệm' : 'From cache'}
+              </span>
+            )}
+            <button className="btn btn-sm" onClick={handleDetect} disabled={detecting}>
+              🔄 {locale === 'vi' ? 'Phát hiện lại' : 'Re-detect'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Style locked badge */}

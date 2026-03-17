@@ -198,6 +198,25 @@ export interface StyleLibrary {
   prompt: PromptSchema;
   prompt_history: PromptSchema[]; // version history
   generated_images: GeneratedImage[];
+  // Cached variant detection results (persisted so AI only detects once)
+  cached_variant_fields?: VariantFieldCache;
+}
+
+export interface VariantFieldCache {
+  style_summary: string;
+  fields: Array<{
+    group: string;
+    field: string;
+    label_vi: string;
+    label_en: string;
+    hint_vi: string;
+    hint_en: string;
+    placeholder_vi: string;
+    placeholder_en: string;
+    importance: 'required' | 'recommended' | 'optional';
+    input_type: 'text' | 'textarea' | 'tags';
+  }>;
+  detected_at: string; // ISO timestamp
 }
 
 export interface GeneratedImage {
