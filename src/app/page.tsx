@@ -770,36 +770,29 @@ function CompareView({ style, settings, locale, onBack, onUpdate, showToast }: {
         <textarea className="form-textarea" value={promptText} onChange={(e) => setPromptText(e.target.value)} rows={4} placeholder={L('compare_prompt_placeholder')} />
       </div>
 
+      {/* User Feedback — always visible so users can provide context before analyzing */}
+      <div className="card" style={{ marginTop: '16px' }}>
+        <div className="card-header">
+          <h3 className="card-title">💬 {locale === 'vi' ? 'Phản hồi của bạn' : 'Your Feedback'}</h3>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{locale === 'vi' ? 'Tùy chọn' : 'Optional'}</span>
+        </div>
+        <textarea
+          className="form-textarea"
+          value={userFeedback}
+          onChange={(e) => setUserFeedback(e.target.value)}
+          rows={2}
+          placeholder={locale === 'vi'
+            ? 'Nhập phản hồi để cải thiện kết quả, VD: "Tôi muốn màu sắc ấm hơn" hoặc "Ánh sáng cần mềm mại hơn"...'
+            : 'Enter feedback to guide improvements, e.g. "I want warmer colors" or "Lighting needs to be softer"...'}
+        />
+      </div>
+
       <div style={{ marginTop: '20px', textAlign: 'center' }}>
         <button className="btn btn-primary btn-lg" onClick={handleCompare} disabled={comparing || generatedImages.length === 0}>
           {comparing ? <><span className="loading-spinner"></span> {L('compare_analyzing')}</> : <>{L('compare_btn')}</>}
         </button>
       </div>
 
-      {/* User Feedback — shown after results for re-improvement */}
-      {comparison && (
-        <div className="card" style={{ marginTop: '20px' }}>
-          <div className="card-header">
-            <h3 className="card-title">💬 {locale === 'vi' ? 'Phản hồi của bạn' : 'Your Feedback'}</h3>
-          </div>
-          <textarea
-            className="form-textarea"
-            value={userFeedback}
-            onChange={(e) => setUserFeedback(e.target.value)}
-            rows={3}
-            placeholder={locale === 'vi'
-              ? 'Nhập phản hồi để cải thiện kết quả, VD: "Tôi muốn màu sắc ấm hơn" hoặc "Ánh sáng cần mềm mại hơn"...'
-              : 'Enter feedback to improve results, e.g. "I want warmer colors" or "Lighting needs to be softer"...'}
-          />
-          {userFeedback.trim() && (
-            <div style={{ marginTop: '8px', textAlign: 'right' }}>
-              <button className="btn btn-sm btn-primary" onClick={handleCompare} disabled={comparing}>
-                {comparing ? <><span className="loading-spinner"></span></> : <>{locale === 'vi' ? '🔄 Phân tích lại với phản hồi' : '🔄 Re-analyze with feedback'}</>}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {comparing && (
         <div className="analysis-progress slide-in" style={{ marginTop: '24px' }}>
@@ -946,6 +939,10 @@ function GenerateView({ style, settings, locale, onBack, onUpdate, showToast }: 
   const [resultPrompt, setResultPrompt] = useState<string>('');
   const [detected, setDetected] = useState(false);
   const [fromCache, setFromCache] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<string>('1:1');
+  const [cameraAngle, setCameraAngle] = useState<string>(
+    ((style.prompt.composition as unknown as Record<string, unknown> | undefined)?.camera_angle as string) || ''
+  );
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
   // Load cached fields or auto-detect on mount
@@ -1018,6 +1015,20 @@ function GenerateView({ style, settings, locale, onBack, onUpdate, showToast }: 
       if (!variantPrompt[f.group] || typeof variantPrompt[f.group] !== 'object') return;
       (variantPrompt[f.group] as Record<string, unknown>)[f.field] = val;
     });
+
+    // Merge aspect ratio into generation_params
+    if (!variantPrompt.generation_params || typeof variantPrompt.generation_params !== 'object') {
+      variantPrompt.generation_params = {};
+    }
+    (variantPrompt.generation_params as Record<string, unknown>).aspect_ratio = aspectRatio;
+
+    // Merge camera angle into composition (if user specified, override style default)
+    if (cameraAngle.trim()) {
+      if (!variantPrompt.composition || typeof variantPrompt.composition !== 'object') {
+        variantPrompt.composition = {};
+      }
+      (variantPrompt.composition as Record<string, unknown>).camera_angle = cameraAngle.trim();
+    }
 
     // Generate clean JSON prompt (strip nulls)
     const clean: Record<string, unknown> = {};
@@ -1108,6 +1119,36 @@ function GenerateView({ style, settings, locale, onBack, onUpdate, showToast }: 
 
       {detected && variantFields.length > 0 && !resultPrompt && (
         <div className="slide-in">
+          {/* Aspect Ratio & Camera Angle — always shown */}
+          <div className="card" style={{ marginBottom: '20px', padding: '16px' }}>
+            <h3 className="card-title" style={{ marginBottom: '12px' }}>📏 {locale === 'vi' ? 'Cài đặt khung hình' : 'Frame Settings'}</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">{locale === 'vi' ? 'Tỉ lệ khung hình' : 'Aspect Ratio'}</label>
+                <select className="form-select" value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
+                  <option value="1:1">1:1 (Square)</option>
+                  <option value="4:3">4:3 (Standard)</option>
+                  <option value="3:4">3:4 (Portrait)</option>
+                  <option value="16:9">16:9 (Widescreen)</option>
+                  <option value="9:16">9:16 (Story/Reel)</option>
+                  <option value="3:2">3:2 (Photo)</option>
+                  <option value="2:3">2:3 (Portrait Photo)</option>
+                  <option value="21:9">21:9 (Cinematic)</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">{locale === 'vi' ? 'Góc nhìn' : 'Camera Angle'}
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
+                    {locale === 'vi' ? '(để trống = theo style)' : '(empty = from style)'}
+                  </span>
+                </label>
+                <input className="form-input" value={cameraAngle}
+                  onChange={(e) => setCameraAngle(e.target.value)}
+                  placeholder={locale === 'vi' ? 'VD: eye level, bird\'s eye, low angle...' : 'e.g. eye level, bird\'s eye, low angle...'}
+                />
+              </div>
+            </div>
+          </div>
           {/* Required first */}
           {(['required', 'recommended', 'optional'] as const).map(imp => {
             const fields = variantFields.filter(f => f.importance === imp);
