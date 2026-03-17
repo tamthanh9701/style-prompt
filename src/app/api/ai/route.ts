@@ -583,16 +583,34 @@ async function resolveVertexAuth(
   return { authHeader: { 'Authorization': `Bearer ${apiKey}` } };
 }
 
+// Detect if a model needs global endpoint (preview/experimental models)
+function isPreviewModel(model: string): boolean {
+  const previewIndicators = ['preview', 'experimental', 'exp', 'latest', 'beta'];
+  const lower = model.toLowerCase();
+  return previewIndicators.some(ind => lower.includes(ind));
+}
+
 // Build Vertex AI URL from project + location, or use manual base_url
+// Preview/experimental models → global endpoint + v1beta1
+// Stable models → regional endpoint + v1
 function buildVertexUrl(baseUrl: string, project?: string, location?: string, model?: string): string {
   if (baseUrl && baseUrl.includes('aiplatform.googleapis.com')) {
     // Manual base_url provided — use it directly
     return `${baseUrl.replace(/\/$/, '')}/publishers/google/models/${model}:generateContent`;
   }
-  // Auto-construct from project + location
-  const loc = location || 'us-central1';
+
   if (!project) throw new Error('Vertex AI: project_id is required (set in Settings → Vertex Project)');
-  return `https://${loc}-aiplatform.googleapis.com/v1/projects/${project}/locations/${loc}/publishers/google/models/${model}:generateContent`;
+
+  const preview = isPreviewModel(model || '');
+  const apiVersion = preview ? 'v1beta1' : 'v1';
+  const loc = preview ? 'global' : (location || 'us-central1');
+  const host = preview
+    ? 'aiplatform.googleapis.com'                    // global endpoint
+    : `${location || 'us-central1'}-aiplatform.googleapis.com`; // regional endpoint
+
+  const url = `https://${host}/${apiVersion}/projects/${project}/locations/${loc}/publishers/google/models/${model}:generateContent`;
+  console.log(`[VERTEX] URL resolved: ${url} (preview=${preview}, apiVersion=${apiVersion}, location=${loc})`);
+  return url;
 }
 
 async function callVertexAI(

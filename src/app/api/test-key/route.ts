@@ -74,17 +74,26 @@ export async function POST(request: NextRequest) {
       // Google Vertex AI — supports: Service Account Credentials, Google API Key (AIza*), OAuth2 Bearer token
 
       const testModel = model || 'gemini-2.0-flash';
-      const loc = vertex_location || 'us-central1';
+
+      // Auto-detect preview/experimental models → global endpoint + v1beta1
+      const previewIndicators = ['preview', 'experimental', 'exp', 'latest', 'beta'];
+      const isPreview = previewIndicators.some(ind => testModel.toLowerCase().includes(ind));
+      const apiVersion = isPreview ? 'v1beta1' : 'v1';
+      const loc = isPreview ? 'global' : (vertex_location || 'us-central1');
+      const host = isPreview
+        ? 'aiplatform.googleapis.com'
+        : `${vertex_location || 'us-central1'}-aiplatform.googleapis.com`;
 
       // Build URL
       let testUrl: string;
       if (base_url && base_url.includes('aiplatform.googleapis.com')) {
         testUrl = `${base_url.replace(/\/$/, '')}/publishers/google/models/${testModel}:generateContent`;
       } else if (vertex_project) {
-        testUrl = `https://${loc}-aiplatform.googleapis.com/v1/projects/${vertex_project}/locations/${loc}/publishers/google/models/${testModel}:generateContent`;
+        testUrl = `https://${host}/${apiVersion}/projects/${vertex_project}/locations/${loc}/publishers/google/models/${testModel}:generateContent`;
       } else {
         throw new Error('Vertex AI: Please provide either a Vertex Project ID or a full Base URL');
       }
+      console.log(`[VERTEX TEST] URL: ${testUrl} (preview=${isPreview}, apiVersion=${apiVersion}, location=${loc})`);
 
       // Resolve auth
       let authHeaders: Record<string, string> = {};
