@@ -1439,6 +1439,9 @@ function StyleTransferView({ style, settings, locale, onBack, showToast }: {
                     <strong>📝</strong> {imageDescription}
                   </div>
                 )}
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '10px', fontStyle: 'italic' }}>
+                  ✏️ {locale === 'vi' ? 'Chỉnh sửa các trường bên dưới trước khi tạo prompt' : 'Edit fields below before generating prompt'}
+                </div>
                 {Object.entries(extractedSubject).map(([groupKey, groupVal]) => {
                   if (!groupVal || typeof groupVal !== 'object') return null;
                   const entries = Object.entries(groupVal as Record<string, unknown>).filter(([, v]) =>
@@ -1447,18 +1450,47 @@ function StyleTransferView({ style, settings, locale, onBack, showToast }: {
                   if (entries.length === 0) return null;
                   const locGroup = getGroupLabel(locale, groupKey);
                   return (
-                    <div key={groupKey} style={{ marginBottom: '12px' }}>
+                    <div key={groupKey} style={{ marginBottom: '14px' }}>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px', fontSize: '0.8125rem' }}>
                         🧩 {locGroup.label || groupKey}
                       </div>
                       {entries.map(([fk, fv]) => {
                         const locField = getFieldLabel(locale, groupKey, fk);
+                        const strVal = Array.isArray(fv) ? (fv as string[]).join(', ') : String(fv);
+                        const isLong = strVal.length > 60;
                         return (
-                          <div key={fk} style={{ display: 'flex', gap: '8px', marginBottom: '4px', fontSize: '0.8125rem' }}>
-                            <span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>{locField.label || fk}:</span>
-                            <span style={{ color: 'var(--text-secondary)' }}>
-                              {Array.isArray(fv) ? (fv as string[]).join(', ') : String(fv)}
-                            </span>
+                          <div key={fk} className="form-group" style={{ marginBottom: '6px' }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '2px' }}>{locField.label || fk}</label>
+                            {isLong ? (
+                              <textarea
+                                className="form-textarea"
+                                rows={2}
+                                value={strVal}
+                                onChange={(e) => {
+                                  setExtractedSubject(prev => {
+                                    if (!prev) return prev;
+                                    const updated = { ...prev };
+                                    updated[groupKey] = { ...updated[groupKey], [fk]: Array.isArray(fv) ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : e.target.value };
+                                    return updated;
+                                  });
+                                }}
+                                style={{ fontSize: '0.8125rem' }}
+                              />
+                            ) : (
+                              <input
+                                className="form-input"
+                                value={strVal}
+                                onChange={(e) => {
+                                  setExtractedSubject(prev => {
+                                    if (!prev) return prev;
+                                    const updated = { ...prev };
+                                    updated[groupKey] = { ...updated[groupKey], [fk]: Array.isArray(fv) ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : e.target.value };
+                                    return updated;
+                                  });
+                                }}
+                                style={{ fontSize: '0.8125rem' }}
+                              />
+                            )}
                           </div>
                         );
                       })}
