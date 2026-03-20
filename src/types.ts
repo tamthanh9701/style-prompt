@@ -187,6 +187,8 @@ export interface PromptSchema {
 // ============================================================
 // Style Library
 // ============================================================
+// Status lifecycle: draft → active → deprecated
+export type StyleStatus = 'draft' | 'active' | 'deprecated';
 
 export interface StyleLibrary {
   id: string;
@@ -194,12 +196,20 @@ export interface StyleLibrary {
   description: string;
   created_at: string;
   updated_at: string;
+  // Lifecycle & versioning
+  status: StyleStatus;
+  version: number; // auto-increment: 1, 2, 3...
+  parent_version_id?: string; // links to previous version for version chain
+  // Content
   reference_images: string[]; // base64 data URLs
   prompt: PromptSchema;
   prompt_history: PromptSchema[]; // version history
   generated_images: GeneratedImage[];
   // Cached variant detection results (persisted so AI only detects once)
   cached_variant_fields?: VariantFieldCache;
+  // Tracking
+  prompt_instances: PromptInstance[];
+  eval_records: EvalRecord[];
 }
 
 export interface VariantFieldCache {
@@ -224,6 +234,34 @@ export interface GeneratedImage {
   image_data: string; // base64 data URL
   prompt_used: PromptSchema;
   prompt_text: string;
+  created_at: string;
+  prompt_instance_id?: string; // link to PromptInstance
+}
+
+// ============================================================
+// Framework Entities: PromptInstance, EvalRecord
+// ============================================================
+
+export type PromptTask = 'create_style' | 'generate_new' | 'refine_prompt' | 'style_transfer';
+
+export interface PromptInstance {
+  id: string;
+  style_id: string;
+  style_version: number;
+  task: PromptTask;
+  subject_snapshot: Record<string, unknown>; // SubjectProfile at time of generation
+  final_prompt: string; // JSON or text
+  model_used: string;
+  created_at: string;
+}
+
+export interface EvalRecord {
+  id: string;
+  prompt_instance_id: string;
+  style_id: string;
+  style_fidelity_score: number; // 1-5
+  content_match_score: number; // 1-5
+  notes: string;
   created_at: string;
 }
 

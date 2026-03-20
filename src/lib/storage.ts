@@ -1,4 +1,4 @@
-import type { StyleLibrary, AppSettings, AIProviderType, DEFAULT_PROVIDERS } from '@/types';
+import type { StyleLibrary, AppSettings, AIProviderType, DEFAULT_PROVIDERS, PromptInstance, EvalRecord, PromptTask } from '@/types';
 
 const STORAGE_KEY = 'style_prompt_library';
 const SETTINGS_KEY = 'style_prompt_settings';
@@ -11,7 +11,15 @@ export function getStyles(): StyleLibrary[] {
   if (typeof window === 'undefined') return [];
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const styles: StyleLibrary[] = data ? JSON.parse(data) : [];
+    // Migration: add missing fields for old data
+    return styles.map(s => ({
+      ...s,
+      status: s.status || 'active',
+      version: s.version || 1,
+      prompt_instances: s.prompt_instances || [],
+      eval_records: s.eval_records || [],
+    }));
   } catch {
     return [];
   }
@@ -43,6 +51,78 @@ export function updateStyle(id: string, updates: Partial<StyleLibrary>): void {
 
 export function deleteStyle(id: string): void {
   const styles = getStyles().filter(s => s.id !== id);
+  saveStyles(styles);
+}
+
+// ============================================================
+// Version Lifecycle Management
+// ============================================================
+
+/** Promote a draft style to active, deprecating any previous active version with same name */
+export function promoteStyle(id: string): void {
+  const styles = getStyles();
+  const target = styles.find(s => s.id === id);
+  if (!target || target.status !== 'draft') return;
+
+  // Deprecate any other active style with same name
+  styles.forEach(s => {
+    if (s.name === target.name && s.status === 'active' && s.id !== id) {
+      s.status = 'deprecated';
+      s.updated_at = new Date().toISOString();
+    }
+  });
+
+  target.status = 'active';
+  target.updated_at = new Date().toISOString();
+  saveStyles(styles);
+}
+
+/** Create a new draft version from an existing style */
+export function createNewVersion(sourceId: string): StyleLibrary | null {
+  const styles = getStyles();
+  const source = styles.find(s => s.id === sourceId);
+  if (!source) return null;
+
+  const maxVersion = styles
+    .filter(s => s.name === source.name)
+    .reduce((max, s) => Math.max(max, s.version || 1), 0);
+
+  const newStyle: StyleLibrary = {
+    ...JSON.parse(JSON.stringify(source)),
+    id: generateId(),
+    status: 'draft' as const,
+    version: maxVersion + 1,
+    parent_version_id: source.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    prompt_instances: [],
+    eval_records: [],
+    cached_variant_fields: source.cached_variant_fields,
+  };
+  styles.unshift(newStyle);
+  saveStyles(styles);
+  return newStyle;
+}
+
+/** Add a PromptInstance to a style */
+export function addPromptInstance(styleId: string, instance: PromptInstance): void {
+  const styles = getStyles();
+  const style = styles.find(s => s.id === styleId);
+  if (!style) return;
+  if (!style.prompt_instances) style.prompt_instances = [];
+  style.prompt_instances.unshift(instance);
+  style.updated_at = new Date().toISOString();
+  saveStyles(styles);
+}
+
+/** Add an EvalRecord to a style */
+export function addEvalRecord(styleId: string, record: EvalRecord): void {
+  const styles = getStyles();
+  const style = styles.find(s => s.id === styleId);
+  if (!style) return;
+  if (!style.eval_records) style.eval_records = [];
+  style.eval_records.unshift(record);
+  style.updated_at = new Date().toISOString();
   saveStyles(styles);
 }
 

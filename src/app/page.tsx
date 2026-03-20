@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { StyleLibrary, AppSettings, PromptSchema } from '@/types';
+import type { StyleLibrary, AppSettings, PromptSchema, PromptInstance, EvalRecord, StyleStatus } from '@/types';
 import { createEmptyPrompt, flattenPrompt, generateJsonPrompt, PROMPT_GROUPS, STYLE_GROUPS, SUBJECT_GROUPS, getGroupCategory } from '@/types';
-import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings, fileToBase64, generateId, callAI } from '@/lib/storage';
+import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings, fileToBase64, generateId, callAI, promoteStyle, createNewVersion, addPromptInstance, addEvalRecord } from '@/lib/storage';
 import { type Locale, getLocale, setLocale as persistLocale, t, getGroupLabel, getFieldLabel } from '@/lib/i18n';
 
 // ============================================================
@@ -121,10 +121,34 @@ function LibraryView({ styles, locale, onSelect, onCreate, onDelete }: {
   onDelete: (id: string) => void;
 }) {
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+  const [statusFilter, setStatusFilter] = useState<StyleStatus | 'all'>('all');
+  const filteredStyles = statusFilter === 'all' ? styles.filter(s => (s.status || 'active') !== 'deprecated') : styles.filter(s => (s.status || 'active') === statusFilter);
+  const statusBadge = (status: StyleStatus) => {
+    const map: Record<StyleStatus, { emoji: string; color: string; label: string }> = {
+      draft: { emoji: '🟡', color: 'rgba(234,179,8,0.15)', label: 'Draft' },
+      active: { emoji: '🟢', color: 'rgba(34,197,94,0.15)', label: 'Active' },
+      deprecated: { emoji: '⚫', color: 'rgba(100,100,100,0.15)', label: 'Deprecated' },
+    };
+    const s = map[status] || map.active;
+    return <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.color, whiteSpace: 'nowrap' }}>{s.emoji} {s.label}</span>;
+  };
   return (
     <div>
       <div className="page-header"><h1 className="page-title">{L('lib_title')}</h1><p className="page-subtitle">{L('lib_subtitle')}</p></div>
-      {styles.length === 0 ? (
+      {/* Status filter tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {(['all', 'active', 'draft', 'deprecated'] as const).map(f => (
+          <button key={f} className={`btn btn-sm ${statusFilter === f ? 'btn-primary' : ''}`}
+            onClick={() => setStatusFilter(f)}
+            style={{ fontSize: '0.8rem' }}>
+            {f === 'all' ? (locale === 'vi' ? '📋 Tất cả' : '📋 All') : f === 'active' ? '🟢 Active' : f === 'draft' ? '🟡 Draft' : '⚫ Deprecated'}
+          </button>
+        ))}
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          {filteredStyles.length} / {styles.length} styles
+        </span>
+      </div>
+      {filteredStyles.length === 0 && styles.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🖼️</div>
           <h2 className="empty-state-title">{L('lib_empty_title')}</h2>
@@ -133,16 +157,21 @@ function LibraryView({ styles, locale, onSelect, onCreate, onDelete }: {
         </div>
       ) : (
         <div className="styles-grid">
-          {styles.map((style) => (
-            <div key={style.id} className="style-card" onClick={() => onSelect(style.id)}>
+          {filteredStyles.map((style) => (
+            <div key={style.id} className="style-card" onClick={() => onSelect(style.id)}
+              style={(style.status || 'active') === 'deprecated' ? { opacity: 0.6 } : undefined}>
               <div className="style-card-images">
                 {style.reference_images.slice(0, 3).map((img, i) => (<img key={i} src={img} alt={`${style.name} ref ${i + 1}`} />))}
                 {style.reference_images.length === 0 && (<div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No images</div>)}
               </div>
               <div className="style-card-body">
-                <div className="style-card-name">{style.name}</div>
+                <div className="style-card-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {style.name}
+                  {statusBadge(style.status || 'active')}
+                </div>
                 <div className="style-card-meta">
                   <span className="style-card-badge">{style.prompt.subject_type}</span>
+                  <span style={{ fontSize: '0.7rem' }}>v{style.version || 1}</span>
                   <span>{style.reference_images.length} {L('lib_images')}</span>
                   <span>{new Date(style.updated_at).toLocaleDateString()}</span>
                 </div>
@@ -212,10 +241,14 @@ function CreateStyleView({ settings, locale, onBack, onCreate, showToast }: {
         description: '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        status: 'draft',
+        version: 1,
         reference_images: images,
         prompt,
         prompt_history: [prompt],
         generated_images: [],
+        prompt_instances: [],
+        eval_records: [],
       };
 
       setAnalysisResult({ style, fieldCount });
@@ -390,8 +423,34 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, o
     <div>
       <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_library')}</a>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div><h1 className="page-title">{style.name}</h1><p className="page-subtitle">{L('edit_subtitle')}</p></div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <h1 className="page-title" style={{ margin: 0 }}>{style.name}</h1>
+            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99,102,241,0.12)', color: 'var(--text-secondary)' }}>v{style.version || 1}</span>
+            <span style={{
+              fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px',
+              background: (style.status || 'active') === 'active' ? 'rgba(34,197,94,0.15)' : (style.status || 'active') === 'draft' ? 'rgba(234,179,8,0.15)' : 'rgba(100,100,100,0.15)',
+            }}>
+              {(style.status || 'active') === 'active' ? '🟢 Active' : (style.status || 'active') === 'draft' ? '🟡 Draft' : '⚫ Deprecated'}
+            </span>
+          </div>
+          <p className="page-subtitle">{L('edit_subtitle')}</p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {(style.status || 'active') === 'draft' && (
+            <button className="btn" style={{ background: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.3)' }}
+              onClick={() => { promoteStyle(style.id); onUpdate(style.id, {}); showToast(locale === 'vi' ? 'Đã kích hoạt style!' : 'Style activated!'); }}>
+              🚀 {locale === 'vi' ? 'Kích hoạt' : 'Activate'}
+            </button>
+          )}
+          {(style.status || 'active') === 'active' && (
+            <button className="btn" onClick={() => {
+              const newVer = createNewVersion(style.id);
+              if (newVer) { onUpdate(style.id, {}); showToast(locale === 'vi' ? `Đã tạo bản nháp v${newVer.version}` : `Created draft v${newVer.version}`); }
+            }}>
+              📝 {locale === 'vi' ? 'Phiên bản mới' : 'New Version'}
+            </button>
+          )}
           <button className="btn" onClick={onGenerate}>🖼️ {locale === 'vi' ? 'Tạo Ảnh Mới' : 'New Image'}</button>
           <button className="btn" onClick={onTransfer}>🔄 {locale === 'vi' ? 'Chuyển Style' : 'Style Transfer'}</button>
           <button className="btn" onClick={onCompare}>{L('edit_improve_btn')}</button>
@@ -1249,6 +1308,19 @@ function GenerateView({ style, settings, locale, onBack, onUpdate, showToast }: 
           </pre>
         </div>
       )}
+
+      {/* Eval Form — rate generated prompt */}
+      {resultPrompt && (
+        <EvalForm
+          locale={locale}
+          styleId={style.id}
+          styleVersion={style.version || 1}
+          task="generate_new"
+          finalPrompt={resultPrompt}
+          settings={settings}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
@@ -1555,11 +1627,126 @@ function StyleTransferView({ style, settings, locale, onBack, showToast }: {
           </pre>
         </div>
       )}
+
+      {/* Eval Form for style transfer */}
+      {resultPrompt && (
+        <EvalForm
+          locale={locale}
+          styleId={style.id}
+          styleVersion={style.version || 1}
+          task="style_transfer"
+          finalPrompt={resultPrompt}
+          settings={settings}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
 
+// ============================================================
+// EvalForm — Reusable evaluation form (style fidelity + content match)
+// ============================================================
 
+function EvalForm({ locale, styleId, styleVersion, task, finalPrompt, settings, showToast }: {
+  locale: Locale;
+  styleId: string;
+  styleVersion: number;
+  task: import('@/types').PromptTask;
+  finalPrompt: string;
+  settings: AppSettings;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+}) {
+  const [styleFidelity, setStyleFidelity] = useState(0);
+  const [contentMatch, setContentMatch] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  const StarRating = ({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', minWidth: '140px' }}>{label}</span>
+      <div style={{ display: 'flex', gap: '2px' }}>
+        {[1, 2, 3, 4, 5].map(star => (
+          <button key={star} type="button"
+            onClick={() => onChange(star)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', padding: '2px',
+              color: star <= value ? '#f59e0b' : 'var(--border-color)',
+              transition: 'color 0.15s',
+            }}>
+            {star <= value ? '★' : '☆'}
+          </button>
+        ))}
+      </div>
+      {value > 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{value}/5</span>}
+    </div>
+  );
+
+  const handleSave = () => {
+    if (styleFidelity === 0 || contentMatch === 0) {
+      showToast(locale === 'vi' ? 'Vui lòng đánh giá cả hai tiêu chí' : 'Please rate both criteria', 'warning');
+      return;
+    }
+    const instanceId = generateId();
+    const provider = settings.providers[settings.active_provider];
+
+    addPromptInstance(styleId, {
+      id: instanceId,
+      style_id: styleId,
+      style_version: styleVersion,
+      task,
+      subject_snapshot: {},
+      final_prompt: finalPrompt,
+      model_used: provider.model,
+      created_at: new Date().toISOString(),
+    });
+
+    addEvalRecord(styleId, {
+      id: generateId(),
+      prompt_instance_id: instanceId,
+      style_id: styleId,
+      style_fidelity_score: styleFidelity,
+      content_match_score: contentMatch,
+      notes,
+      created_at: new Date().toISOString(),
+    });
+
+    setSaved(true);
+    showToast(locale === 'vi' ? 'Đã lưu đánh giá!' : 'Evaluation saved!');
+  };
+
+  if (saved) {
+    return (
+      <div className="card" style={{ marginTop: '12px', padding: '16px', textAlign: 'center', border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.05)' }}>
+        <span style={{ fontSize: '1.25rem' }}>✅</span> {locale === 'vi' ? 'Đã lưu đánh giá' : 'Evaluation saved'}
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '8px' }}>Style: ★{styleFidelity} | Content: ★{contentMatch}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ marginTop: '12px', padding: '16px', border: '1px solid rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.03)' }}>
+      <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '12px', color: 'var(--text-primary)' }}>
+        📊 {locale === 'vi' ? 'Đánh giá prompt' : 'Evaluate Prompt'}
+      </div>
+      <StarRating label={locale === 'vi' ? 'Độ giống style' : 'Style Fidelity'} value={styleFidelity} onChange={setStyleFidelity} />
+      <StarRating label={locale === 'vi' ? 'Độ khớp nội dung' : 'Content Match'} value={contentMatch} onChange={setContentMatch} />
+      <div className="form-group" style={{ marginBottom: '10px', marginTop: '4px' }}>
+        <textarea
+          className="form-textarea"
+          placeholder={locale === 'vi' ? 'Ghi chú (tùy chọn): palette, lighting, composition...' : 'Notes (optional): palette, lighting, composition...'}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          style={{ fontSize: '0.8125rem' }}
+        />
+      </div>
+      <button className="btn btn-sm btn-primary" onClick={handleSave}>
+        💾 {locale === 'vi' ? 'Lưu đánh giá' : 'Save Evaluation'}
+      </button>
+    </div>
+  );
+}
 
 function LogsView({ locale, onBack }: { locale: Locale; onBack: () => void }) {
   const [logs, setLogs] = useState<import('@/lib/logger').LogEntry[]>([]);
