@@ -91,12 +91,12 @@ export default function HomePage() {
       <div className="fade-in">
         {view === 'library' && <LibraryView styles={styles} locale={locale} onSelect={(id) => { setSelectedStyleId(id); setView('edit'); }} onCreate={() => setView('create')} onDelete={handleDeleteStyle} />}
         {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
-        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onCompare={() => setView('compare')} onGenerate={() => setView('generate')} onTransfer={() => setView('transfer')} showToast={showToast} />}
+        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onCompare={() => setView('compare')} onGenerate={() => setView('generate')} onTransfer={() => setView('transfer')} onEditImage={() => setView('edit_image')} showToast={showToast} />}
         {view === 'compare' && selectedStyle && <CompareView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} />}
         {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} />}
         {view === 'transfer' && selectedStyle && <StyleTransferView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} showToast={showToast} />}
         {view === 'logs' && <LogsView locale={locale} onBack={() => setView('library')} />}
-        {view === 'edit_image' && <ImageEditView styles={styles} settings={settings} locale={locale} onBack={() => setView('library')} showToast={showToast} />}
+        {view === 'edit_image' && <ImageEditView style={selectedStyle} styles={styles} settings={settings} locale={locale} onBack={() => selectedStyle ? setView('edit') : setView('library')} showToast={showToast} />}
         {view === 'settings' && <SettingsView settings={settings} locale={locale} onBack={() => setView('library')} onSave={handleSettingsSave} showToast={showToast} />}
       </div>
 
@@ -366,7 +366,7 @@ function CreateStyleView({ settings, locale, onBack, onCreate, showToast }: {
 // Edit Style View (Prompt Editor) — with localized field labels
 // ============================================================
 
-function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, onGenerate, onTransfer, showToast }: {
+function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, onGenerate, onTransfer, onEditImage, showToast }: {
   style: StyleLibrary;
   settings: AppSettings;
   locale: Locale;
@@ -375,6 +375,7 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, o
   onCompare: () => void;
   onGenerate: () => void;
   onTransfer: () => void;
+  onEditImage: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
 }) {
   const [prompt, setPrompt] = useState<PromptSchema>(style.prompt);
@@ -455,6 +456,7 @@ function EditStyleView({ style, settings, locale, onBack, onUpdate, onCompare, o
           )}
           <button className="btn" onClick={onGenerate}>🖼️ {locale === 'vi' ? 'Tạo Ảnh Mới' : 'New Image'}</button>
           <button className="btn" onClick={onTransfer}>🔄 {locale === 'vi' ? 'Chuyển Style' : 'Style Transfer'}</button>
+          <button className="btn" onClick={onEditImage}>✏️ {locale === 'vi' ? 'Chỉnh sửa ảnh' : 'Edit Image'}</button>
           <button className="btn" onClick={onCompare}>{L('edit_improve_btn')}</button>
           <button className="btn btn-primary" onClick={handleSave}>{L('edit_save_btn')}</button>
         </div>
@@ -1754,29 +1756,42 @@ function EvalForm({ locale, styleId, styleVersion, task, finalPrompt, settings, 
 // Image Edit View — Upload image → AI analyzes → Edit params → Generate edit prompt
 // ============================================================
 
-function ImageEditView({ styles, settings, locale, onBack, showToast }: {
+function ImageEditView({ style, styles, settings, locale, onBack, showToast }: {
+  style?: StyleLibrary;
   styles: StyleLibrary[];
   settings: AppSettings;
   locale: Locale;
   onBack: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
 }) {
-  const [sourceImage, setSourceImage] = useState<string>('');
+  // Pre-load from style if coming from library
+  const preloadedImage = style?.reference_images?.[0] || '';
+  const preloadedAnalysis = style ? style.prompt : null;
+
+  const [sourceImage, setSourceImage] = useState<string>(preloadedImage);
   const [analyzing, setAnalyzing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [originalAnalysis, setOriginalAnalysis] = useState<PromptSchema | null>(null);
-  const [editedPrompt, setEditedPrompt] = useState<PromptSchema | null>(null);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [originalAnalysis, setOriginalAnalysis] = useState<PromptSchema | null>(preloadedAnalysis);
+  const [editedPrompt, setEditedPrompt] = useState<PromptSchema | null>(preloadedAnalysis ? JSON.parse(JSON.stringify(preloadedAnalysis)) : null);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(preloadedAnalysis ? { subject: true, lighting: true, color_palette: true } : {});
   const [editorFilter, setEditorFilter] = useState<'all' | 'style' | 'subject'>('all');
   const [editInstructions, setEditInstructions] = useState('');
   const [intensity, setIntensity] = useState<'light' | 'medium' | 'strong'>('medium');
   const [selectedStyleId, setSelectedStyleId] = useState<string>('');
+  const [selectedRefImage, setSelectedRefImage] = useState<number>(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editResult, setEditResult] = useState<any>(null);
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
   const activeStyles = styles.filter(s => (s.status || 'active') === 'active');
+
+  // When user selects a different reference image from the style
+  const handleSelectRefImage = (index: number) => {
+    if (!style?.reference_images?.[index]) return;
+    setSelectedRefImage(index);
+    setSourceImage(style.reference_images[index]);
+  };
 
   const handleUpload = async (files: FileList | File[]) => {
     const file = Array.from(files).find(f => f.type.startsWith('image/'));
@@ -1940,8 +1955,8 @@ function ImageEditView({ styles, settings, locale, onBack, showToast }: {
     <div>
       <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); onBack(); }}>{L('back_library')}</a>
       <div className="page-header">
-        <h1 className="page-title">{L('edit_img_title')}</h1>
-        <p className="page-subtitle">{L('edit_img_subtitle')}</p>
+        <h1 className="page-title">{L('edit_img_title')}{style ? ` — ${style.name}` : ''}</h1>
+        <p className="page-subtitle">{style ? (locale === 'vi' ? 'Chỉnh sửa thông số từ style đã phân tích → Sinh prompt chỉnh sửa' : 'Edit parameters from analyzed style → Generate edit prompt') : L('edit_img_subtitle')}</p>
       </div>
 
       {/* Step 1: Upload Image */}
@@ -2006,9 +2021,30 @@ function ImageEditView({ styles, settings, locale, onBack, showToast }: {
       {/* Step 2: Edit Parameters */}
       {originalAnalysis && editedPrompt && !editResult && !generating && (
         <div className="slide-in">
-          {/* Source image thumbnail + change counter + controls */}
+          {/* Source image thumbnail + style info + change counter + controls */}
           <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <img src={sourceImage} alt="Source" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '2px solid var(--border-color)' }} />
+            {/* Reference images from library or single source image */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <img src={sourceImage} alt="Source" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '2px solid var(--accent-primary)' }} />
+              {style && style.reference_images.length > 1 && (
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {style.reference_images.map((img, i) => (
+                    <img key={i} src={img} alt={`Ref ${i + 1}`}
+                      onClick={() => handleSelectRefImage(i)}
+                      style={{
+                        width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer',
+                        border: selectedRefImage === i ? '2px solid var(--accent-primary)' : '2px solid var(--border-subtle)',
+                        opacity: selectedRefImage === i ? 1 : 0.6,
+                      }} />
+                  ))}
+                </div>
+              )}
+              {style && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600, textAlign: 'center' }}>
+                  {style.name} v{style.version || 1}
+                </div>
+              )}
+            </div>
             <div style={{ flex: 1, minWidth: '300px' }}>
               {/* Intensity slider */}
               <div className="card" style={{ padding: '14px 16px', marginBottom: '12px' }}>
@@ -2061,12 +2097,18 @@ function ImageEditView({ styles, settings, locale, onBack, showToast }: {
                 </div>
               </div>
 
-              {/* Edit instructions (editable after initial analysis too) */}
-              {editInstructions && (
-                <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'rgba(99,102,241,0.08)', borderLeft: '3px solid var(--accent-primary)', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  <strong>💬</strong> {editInstructions}
-                </div>
-              )}
+              {/* Edit instructions — always editable */}
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>{L('edit_img_instructions_label')}</label>
+                <textarea
+                  className="form-textarea"
+                  value={editInstructions}
+                  onChange={(e) => setEditInstructions(e.target.value)}
+                  rows={2}
+                  placeholder={L('edit_img_instructions_placeholder')}
+                  style={{ fontSize: '0.875rem' }}
+                />
+              </div>
             </div>
           </div>
 
