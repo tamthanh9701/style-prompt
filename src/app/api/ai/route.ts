@@ -10,7 +10,7 @@ export const maxDuration = 120; // seconds
 // ============================================================
 
 interface AIRequestBody {
-  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant' | 'variantFromImage';
+  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant' | 'variantFromImage' | 'analyzeForEdit' | 'generateEditPrompt';
   provider: AIProviderType;
   api_key: string;
   base_url: string;
@@ -296,6 +296,49 @@ Respond with ONLY a valid JSON object:
 }
 
 Extract as many relevant details as possible from the image. The user will edit these values to create a new variant with the same style.`;
+
+const ANALYZE_FOR_EDIT_SYSTEM = `You are an expert image analysis AI. Your task is to analyze the provided image in detail and generate a comprehensive structured JSON prompt that captures every aspect of the image — both STYLE and SUBJECT.
+
+This analysis is for IMAGE EDITING purposes. The user will modify specific parameters and use the result to generate an edit prompt. Therefore, be as detailed and accurate as possible in every field.
+
+You MUST respond with ONLY a valid JSON object matching the exact same structure as the style analysis schema (with all groups: subject, subject_character, subject_object, environment, composition, lighting, color_palette, artistic_style, mood_atmosphere, material_texture, technical_quality, camera_lens, post_processing, negative_prompt, generation_params).
+
+For subject_character and subject_object: only fill in the one that applies based on subject_type. Set the other to all nulls.
+
+Be extremely precise about colors, lighting direction, mood, textures, and composition since the user will modify these for editing.`;
+
+const GENERATE_EDIT_PROMPT_SYSTEM = `You are an expert image editing prompt engineer. You will receive:
+1. The original image (as reference)
+2. The original analysis of the image (all parameters)
+3. The modified parameters (only fields the user changed)
+4. Edit intensity level: "light" (subtle changes), "medium" (noticeable changes), or "strong" (dramatic changes)
+5. Optional: user's natural language edit instructions
+6. Optional: a style profile to apply (STYLE groups from the library)
+
+Your task:
+- Compare original vs modified parameters to understand what changes the user wants
+- If a style profile is provided, merge its STYLE groups (artistic_style, color_palette, lighting, mood_atmosphere, material_texture, technical_quality, camera_lens, post_processing) into the result
+- Generate a complete prompt describing the DESIRED RESULT image (not the original)
+- Adjust the prompt intensity based on the edit intensity level
+- Suggest appropriate denoising strength and workflow
+
+You MUST respond with ONLY a valid JSON object:
+
+{
+  "edit_summary": "Brief description of what will change (1-2 sentences)",
+  "full_prompt": "Complete prompt describing the desired result image. Include both unchanged and changed aspects.",
+  "negative_prompt": "Appropriate negative prompt for the edit",
+  "change_details": [
+    {
+      "field": "group.field_name",
+      "from": "original value",
+      "to": "new value",
+      "impact": "minor | moderate | major"
+    }
+  ],
+  "suggested_strength": 0.0 to 1.0 (denoising strength based on edit intensity and number of changes),
+  "workflow_hint": "img2img | inpainting | controlnet"
+}`;
 
 // ============================================================
 // Provider-specific API calls
@@ -706,8 +749,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!images || images.length === 0) {
-      // generateVariant, suggestImprovements, variantFromImage may not require images
-      if (action !== 'generateVariant' && action !== 'suggestImprovements') {
+      // generateVariant, suggestImprovements may not require images
+      if (action !== 'generateVariant' && action !== 'suggestImprovements' && action !== 'generateEditPrompt') {
         return NextResponse.json({ error: 'At least one image is required' }, { status: 400 });
       }
     }
@@ -759,6 +802,19 @@ Compare the generated images against the reference style images and identify all
           return NextResponse.json({ error: 'Style prompt context is required for variant from image' }, { status: 400 });
         }
         userMessage = `Here is the fixed style prompt JSON:\n\n${body.prompt_context}\n\nAnalyze the provided image and extract its SUBJECT/CONTENT parameters. The user will edit these to create a variant with the same style.`;
+        break;
+
+      case 'analyzeForEdit':
+        systemPrompt = ANALYZE_FOR_EDIT_SYSTEM;
+        userMessage = `Analyze this image in full detail for editing purposes. Capture every visual parameter accurately — the user will modify specific fields to create an edit prompt. Be especially precise about colors, lighting, mood, composition, and textures.`;
+        break;
+
+      case 'generateEditPrompt':
+        systemPrompt = GENERATE_EDIT_PROMPT_SYSTEM;
+        if (!body.prompt_context) {
+          return NextResponse.json({ error: 'Edit context is required' }, { status: 400 });
+        }
+        userMessage = `Generate an image edit prompt based on the following context:\n\n${body.prompt_context}\n\nLook at the provided image as the original reference and generate the edit prompt describing the desired result.`;
         break;
 
       default:

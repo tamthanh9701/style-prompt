@@ -242,7 +242,7 @@ export interface GeneratedImage {
 // Framework Entities: PromptInstance, EvalRecord
 // ============================================================
 
-export type PromptTask = 'create_style' | 'generate_new' | 'refine_prompt' | 'style_transfer';
+export type PromptTask = 'create_style' | 'generate_new' | 'refine_prompt' | 'style_transfer' | 'edit_image';
 
 export interface PromptInstance {
   id: string;

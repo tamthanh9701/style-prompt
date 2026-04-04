@@ -160,6 +160,41 @@ type TranslationKeys = {
   generate_new_variant: string;
   generate_fill_required: string;
   generate_style_summary: string;
+
+  // Image Edit
+  nav_edit_image: string;
+  edit_img_title: string;
+  edit_img_subtitle: string;
+  edit_img_upload_title: string;
+  edit_img_upload_desc: string;
+  edit_img_analyze_btn: string;
+  edit_img_analyzing: string;
+  edit_img_analyzing_title: string;
+  edit_img_analyzing_desc: string;
+  edit_img_upload_warning: string;
+  edit_img_instructions_label: string;
+  edit_img_instructions_placeholder: string;
+  edit_img_original: string;
+  edit_img_modified: string;
+  edit_img_changes_count: string;
+  edit_img_no_changes: string;
+  edit_img_reset_field: string;
+  edit_img_reset_all: string;
+  edit_img_generate_btn: string;
+  edit_img_generating: string;
+  edit_img_result_title: string;
+  edit_img_copy_prompt: string;
+  edit_img_copy_negative: string;
+  edit_img_new_edit: string;
+  edit_img_intensity: string;
+  edit_img_intensity_light: string;
+  edit_img_intensity_medium: string;
+  edit_img_intensity_strong: string;
+  edit_img_apply_style: string;
+  edit_img_no_style: string;
+  edit_img_style_hint: string;
+  edit_img_denoising: string;
+  edit_img_workflow: string;
 };
 
 const translations: Record<Locale, TranslationKeys> = {
@@ -293,6 +328,41 @@ const translations: Record<Locale, TranslationKeys> = {
     generate_new_variant: '↩️ Tạo Variant Mới',
     generate_fill_required: 'Vui lòng điền các trường bắt buộc',
     generate_style_summary: '🎨 Phong cách đã cố định',
+
+    // Image Edit
+    nav_edit_image: '✏️ Chỉnh sửa ảnh',
+    edit_img_title: '✏️ Chỉnh Sửa Hình Ảnh',
+    edit_img_subtitle: 'Tải ảnh lên → AI phân tích thông số → Chỉnh sửa → Sinh prompt chỉnh sửa',
+    edit_img_upload_title: 'Kéo thả ảnh vào đây hoặc nhấn để chọn',
+    edit_img_upload_desc: 'Tải ảnh bạn muốn chỉnh sửa',
+    edit_img_analyze_btn: '🔍 Phân Tích Ảnh',
+    edit_img_analyzing: 'Đang phân tích...',
+    edit_img_analyzing_title: 'AI đang phân tích ảnh của bạn...',
+    edit_img_analyzing_desc: 'AI đang phân tích mọi thông số: màu sắc, ánh sáng, bố cục, phong cách...',
+    edit_img_upload_warning: 'Vui lòng tải lên một ảnh',
+    edit_img_instructions_label: '💬 Hướng dẫn chỉnh sửa (tùy chọn)',
+    edit_img_instructions_placeholder: 'Mô tả cách bạn muốn chỉnh sửa, VD: "Đổi sang hoàng hôn, thêm mưa, màu ấm hơn"...',
+    edit_img_original: 'Gốc',
+    edit_img_modified: 'Đã sửa',
+    edit_img_changes_count: 'thay đổi',
+    edit_img_no_changes: 'Chưa có thay đổi. Chỉnh sửa các thông số bên trên.',
+    edit_img_reset_field: 'Khôi phục',
+    edit_img_reset_all: '↩️ Khôi phục tất cả',
+    edit_img_generate_btn: '✨ Sinh Prompt Chỉnh Sửa',
+    edit_img_generating: 'Đang tạo prompt...',
+    edit_img_result_title: '✅ Prompt Chỉnh Sửa Đã Tạo',
+    edit_img_copy_prompt: '📋 Copy Prompt',
+    edit_img_copy_negative: '📋 Copy Negative',
+    edit_img_new_edit: '🔄 Chỉnh sửa khác',
+    edit_img_intensity: 'Cường độ chỉnh sửa',
+    edit_img_intensity_light: 'Nhẹ',
+    edit_img_intensity_medium: 'Trung bình',
+    edit_img_intensity_strong: 'Mạnh',
+    edit_img_apply_style: 'Áp dụng Style từ Thư Viện',
+    edit_img_no_style: '— Không áp dụng style —',
+    edit_img_style_hint: 'Tùy chọn: chọn style từ thư viện để áp dụng vào kết quả chỉnh sửa',
+    edit_img_denoising: 'Denoising Strength gợi ý',
+    edit_img_workflow: 'Workflow gợi ý',
   },
 
   en: {
@@ -425,6 +495,41 @@ const translations: Record<Locale, TranslationKeys> = {
     generate_new_variant: '↩️ Create New Variant',
     generate_fill_required: 'Please fill in all required fields',
     generate_style_summary: '🎨 Style locked',
+
+    // Image Edit
+    nav_edit_image: '✏️ Edit Image',
+    edit_img_title: '✏️ Image Edit',
+    edit_img_subtitle: 'Upload image → AI analyzes parameters → Edit → Generate edit prompt',
+    edit_img_upload_title: 'Drop image here or click to browse',
+    edit_img_upload_desc: 'Upload the image you want to edit',
+    edit_img_analyze_btn: '🔍 Analyze Image',
+    edit_img_analyzing: 'Analyzing...',
+    edit_img_analyzing_title: 'AI is analyzing your image...',
+    edit_img_analyzing_desc: 'AI is analyzing all parameters: colors, lighting, composition, style...',
+    edit_img_upload_warning: 'Please upload an image',
+    edit_img_instructions_label: '💬 Edit Instructions (optional)',
+    edit_img_instructions_placeholder: 'Describe how you want to edit, e.g., "Change to sunset, add rain, warmer colors"...',
+    edit_img_original: 'Original',
+    edit_img_modified: 'Modified',
+    edit_img_changes_count: 'changes',
+    edit_img_no_changes: 'No changes yet. Edit parameters above.',
+    edit_img_reset_field: 'Reset',
+    edit_img_reset_all: '↩️ Reset All',
+    edit_img_generate_btn: '✨ Generate Edit Prompt',
+    edit_img_generating: 'Generating prompt...',
+    edit_img_result_title: '✅ Edit Prompt Generated',
+    edit_img_copy_prompt: '📋 Copy Prompt',
+    edit_img_copy_negative: '📋 Copy Negative',
+    edit_img_new_edit: '🔄 New Edit',
+    edit_img_intensity: 'Edit Intensity',
+    edit_img_intensity_light: 'Light',
+    edit_img_intensity_medium: 'Medium',
+    edit_img_intensity_strong: 'Strong',
+    edit_img_apply_style: 'Apply Style from Library',
+    edit_img_no_style: '— No style applied —',
+    edit_img_style_hint: 'Optional: select a style from your library to apply to the edit result',
+    edit_img_denoising: 'Suggested Denoising Strength',
+    edit_img_workflow: 'Suggested Workflow',
   },
 };
 
