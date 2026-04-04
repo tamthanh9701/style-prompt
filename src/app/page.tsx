@@ -2023,9 +2023,25 @@ function ImageEditView({ style, styles, settings, locale, onBack, showToast }: {
         <div className="slide-in">
           {/* Source image thumbnail + style info + change counter + controls */}
           <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            {/* Reference images from library or single source image */}
+            {/* Reference images from library or single source image + upload */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <img src={sourceImage} alt="Source" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '2px solid var(--accent-primary)' }} />
+              <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => document.getElementById('edit-file-input-step2')?.click()}>
+                <img src={sourceImage} alt="Source" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '2px solid var(--accent-primary)' }} />
+                <div style={{
+                  position: 'absolute', bottom: '0', left: '0', right: '0', padding: '4px',
+                  background: 'rgba(0,0,0,0.7)', borderRadius: '0 0 var(--radius-sm) var(--radius-sm)',
+                  fontSize: '0.625rem', color: '#fff', textAlign: 'center',
+                }}>
+                  📷 {locale === 'vi' ? 'Nhấn để đổi ảnh' : 'Click to change'}
+                </div>
+              </div>
+              <input id="edit-file-input-step2" type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files) {
+                    const file = Array.from(e.target.files).find(f => f.type.startsWith('image/'));
+                    if (file) fileToBase64(file).then(base64 => setSourceImage(base64));
+                  }
+                }} />
               {style && style.reference_images.length > 1 && (
                 <div style={{ display: 'flex', gap: '4px' }}>
                   {style.reference_images.map((img, i) => (
