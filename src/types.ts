@@ -190,6 +190,9 @@ export interface PromptSchema {
 // Status lifecycle: draft → active → deprecated
 export type StyleStatus = 'draft' | 'active' | 'deprecated';
 
+// Maximum number of reference images per style
+export const MAX_REFERENCE_IMAGES = 30;
+
 export interface StyleLibrary {
   id: string;
   name: string;
@@ -201,10 +204,14 @@ export interface StyleLibrary {
   version: number; // auto-increment: 1, 2, 3...
   parent_version_id?: string; // links to previous version for version chain
   // Content
-  reference_images: string[]; // base64 data URLs
+  // NOTE: actual image data is stored in IndexedDB via lib/db.ts
+  // reference_images kept for backward compat during migration (removed after migration)
+  reference_images: string[]; // DEPRECATED: use getRefImageData(style.id) from lib/db.ts
+  ref_image_count: number;    // count of reference images (source of truth)
   prompt: PromptSchema;
   prompt_history: PromptSchema[]; // version history
-  generated_images: GeneratedImage[];
+  generated_image_ids: string[];  // IDs of GenImageRecord in IndexedDB
+  generated_images: GeneratedImage[]; // DEPRECATED: kept for backward compat
   // Cached variant detection results (persisted so AI only detects once)
   cached_variant_fields?: VariantFieldCache;
   // Tracking
@@ -212,30 +219,36 @@ export interface StyleLibrary {
   eval_records: EvalRecord[];
 }
 
+export interface VariantField {
+  group: string;
+  field: string;
+  label_vi: string;
+  label_en: string;
+  hint_vi: string;
+  hint_en: string;
+  placeholder_vi: string;
+  placeholder_en: string;
+  importance: 'required' | 'recommended' | 'optional';
+  input_type: 'text' | 'textarea' | 'tags';
+}
+
 export interface VariantFieldCache {
   style_summary: string;
-  fields: Array<{
-    group: string;
-    field: string;
-    label_vi: string;
-    label_en: string;
-    hint_vi: string;
-    hint_en: string;
-    placeholder_vi: string;
-    placeholder_en: string;
-    importance: 'required' | 'recommended' | 'optional';
-    input_type: 'text' | 'textarea' | 'tags';
-  }>;
+  fields: VariantField[];
   detected_at: string; // ISO timestamp
 }
 
 export interface GeneratedImage {
   id: string;
-  image_data: string; // base64 data URL
-  prompt_used: PromptSchema;
+  // NOTE: actual image data is in IndexedDB: getGenImageById(id)
+  prompt_json: string;   // JSON string of PromptSchema used
   prompt_text: string;
   created_at: string;
   prompt_instance_id?: string; // link to PromptInstance
+  generation_source: 'imagen' | 'external' | 'unknown';
+  aspect_ratio: string;
+  variant_params?: Record<string, string>;
+  parent_image_id?: string;
 }
 
 // ============================================================
@@ -337,12 +350,52 @@ export interface DifferenceItem {
 }
 
 // ============================================================
+// Image Generation Configuration
+// ============================================================
+
+export type ImageGenProvider = 'vertex_gemini';
+// Model IDs for image generation on Vertex AI
+export const IMAGE_GEN_MODELS = [
+  { id: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash Image (Preview)' },
+  { id: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro Image (Preview)' },
+  { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image (GA)' },
+] as const;
+
+export interface ImageGenConfig {
+  enabled: boolean;
+  provider: ImageGenProvider;        // currently only 'vertex_gemini'
+  model: string;                     // e.g. 'gemini-3.1-flash-image-preview'
+  vertex_project: string;            // GCP project ID
+  vertex_location: string;           // e.g. 'us-central1' or 'global'
+  vertex_credentials: string;        // Service account JSON string
+  default_aspect_ratio: string;      // e.g. '1:1'
+  default_sample_count: number;      // 1-4
+}
+
+export interface ImageGenRequest {
+  prompt: string;
+  negative_prompt?: string;
+  aspect_ratio: string;
+  reference_images?: string[];        // base64 data URLs for style reference
+  sample_count?: number;
+  seed?: number;
+}
+
+export interface ImageGenResponse {
+  images: string[];                  // base64 data URLs returned by model
+  model_used: string;
+  prompt_used: string;
+  aspect_ratio: string;
+}
+
+// ============================================================
 // App Settings
 // ============================================================
 
 export interface AppSettings {
   active_provider: AIProviderType;
   providers: Record<AIProviderType, AIProviderConfig>;
+  image_gen: ImageGenConfig;
 }
 
 // ============================================================

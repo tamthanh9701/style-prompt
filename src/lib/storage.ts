@@ -1,10 +1,12 @@
-import type { StyleLibrary, AppSettings, AIProviderType, DEFAULT_PROVIDERS, PromptInstance, EvalRecord, PromptTask } from '@/types';
+import type { StyleLibrary, AppSettings, AIProviderType, PromptInstance, EvalRecord } from '@/types';
 
 const STORAGE_KEY = 'style_prompt_library';
 const SETTINGS_KEY = 'style_prompt_settings';
 
 // ============================================================
-// Style Library Storage (localStorage + base64 images)
+// Style Library Storage
+// NOTE: Images are stored in IndexedDB (src/lib/db.ts)
+//       Only metadata is kept in localStorage
 // ============================================================
 
 export function getStyles(): StyleLibrary[] {
@@ -19,6 +21,9 @@ export function getStyles(): StyleLibrary[] {
       version: s.version || 1,
       prompt_instances: s.prompt_instances || [],
       eval_records: s.eval_records || [],
+      generated_image_ids: s.generated_image_ids || [],
+      generated_images: s.generated_images || [],
+      ref_image_count: s.ref_image_count ?? (s.reference_images?.length || 0),
     }));
   } catch {
     return [];
@@ -27,7 +32,12 @@ export function getStyles(): StyleLibrary[] {
 
 export function saveStyles(styles: StyleLibrary[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(styles));
+  // Strip large base64 reference_images from localStorage — images live in IndexedDB
+  const stripped = styles.map(s => ({
+    ...s,
+    reference_images: [], // Always clear from localStorage after migration
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
 }
 
 export function getStyleById(id: string): StyleLibrary | undefined {
@@ -97,7 +107,11 @@ export function createNewVersion(sourceId: string): StyleLibrary | null {
     updated_at: new Date().toISOString(),
     prompt_instances: [],
     eval_records: [],
+    generated_image_ids: [],
+    generated_images: [],
     cached_variant_fields: source.cached_variant_fields,
+    ref_image_count: source.ref_image_count || 0,
+    reference_images: [],
   };
   styles.unshift(newStyle);
   saveStyles(styles);
@@ -142,7 +156,6 @@ export function getSettings(): AppSettings {
     const defaults = createDefaultSettings();
 
     // Merge: ensure every provider from defaults exists in saved settings
-    // This handles the case where new providers are added to the app after the user already saved settings
     const mergedProviders = { ...defaults.providers };
     for (const key of Object.keys(saved.providers) as Array<keyof typeof saved.providers>) {
       mergedProviders[key] = { ...defaults.providers[key], ...saved.providers[key] };
@@ -152,6 +165,7 @@ export function getSettings(): AppSettings {
       ...defaults,
       ...saved,
       providers: mergedProviders,
+      image_gen: { ...defaults.image_gen, ...(saved.image_gen || {}) },
     };
   } catch {
     return createDefaultSettings();
@@ -174,6 +188,16 @@ function createDefaultSettings(): AppSettings {
       google: { type: 'google', api_key: '', base_url: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash', enabled: false },
       vertexai: { type: 'vertexai', api_key: '', base_url: '', model: 'gemini-2.0-flash', enabled: false, vertex_project: '', vertex_location: 'us-central1', vertex_credentials: '' },
     },
+    image_gen: {
+      enabled: false,
+      provider: 'vertex_gemini',
+      model: 'gemini-3.1-flash-image-preview',
+      vertex_project: '',
+      vertex_location: 'global',
+      vertex_credentials: '',
+      default_aspect_ratio: '1:1',
+      default_sample_count: 2,
+    },
   };
 }
 
@@ -195,7 +219,7 @@ export function generateId(): string {
 }
 
 // ============================================================
-// AI API Helper
+// AI API Helper (Text Analysis)
 // ============================================================
 
 export async function callAI(
@@ -204,7 +228,6 @@ export async function callAI(
   images: string[],
   options?: { prompt_context?: string; reference_images?: string[] }
 ) {
-  // Lazy-import to avoid SSR issues
   const { logger, startTimer } = await import('./logger');
   const provider = settings.providers[settings.active_provider];
 
@@ -233,7 +256,6 @@ export async function callAI(
       base_url: provider.base_url,
       model: provider.model,
       images,
-      // Vertex AI specific
       ...(settings.active_provider === 'vertexai' ? {
         vertex_project: provider.vertex_project,
         vertex_location: provider.vertex_location,
@@ -242,21 +264,32 @@ export async function callAI(
       ...options,
     }),
   });
-  // Parse response safely — server may return non-JSON (e.g. "Request Entity Too Large")
+
   const responseText = await response.text();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: { result?: any; error?: string; raw?: boolean };
   try {
     data = JSON.parse(responseText);
   } catch {
-    const errMsg = responseText.length > 200 ? responseText.slice(0, 200) + '...' : responseText;
-    logger.error('ai_request', `AI response not JSON: ${action}`, {
-      provider: settings.active_provider,
-      status: response.status,
-      responsePreview: errMsg,
-      elapsedMs: elapsed(),
-    });
-    throw new Error(`Server error (${response.status}): ${errMsg}`);
+    // If strict parsing fails, check if the response acts as a raw string wrap or markdown payload.
+    // Try to extract a JSON block manually before throwing an error.
+    try {
+      const extracted = extractJsonBlock(responseText);
+      if (extracted) {
+        data = { result: extracted };
+      } else {
+        throw new Error('No extractable JSON');
+      }
+    } catch {
+      const errMsg = responseText.length > 200 ? responseText.slice(0, 200) + '...' : responseText;
+      logger.error('ai_request', `AI response not JSON: ${action}`, {
+        provider: settings.active_provider,
+        status: response.status,
+        responsePreview: errMsg,
+        elapsedMs: elapsed(),
+      });
+      throw new Error(`Server error (${response.status}): ${errMsg}`);
+    }
   }
 
   if (!response.ok) {
@@ -281,4 +314,60 @@ export async function callAI(
   });
 
   return data.result;
+}
+
+// ============================================================
+// Image Generation API Helper (Vertex AI Gemini Image)
+// ============================================================
+
+export async function callImageGen(
+  settings: AppSettings,
+  prompt: string,
+  options?: {
+    negative_prompt?: string;
+    aspect_ratio?: string;
+    reference_images?: string[];
+    sample_count?: number;
+    seed?: number;
+  }
+): Promise<string[]> {
+  const cfg = settings.image_gen;
+  if (!cfg.enabled) {
+    throw new Error('Image generation is not enabled. Please configure it in Settings → Image Generation.');
+  }
+  if (!cfg.vertex_credentials && !cfg.vertex_project) {
+    throw new Error('Vertex AI credentials are not configured for image generation.');
+  }
+
+  const response = await fetch('/api/imagen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt,
+      negative_prompt: options?.negative_prompt,
+      aspect_ratio: options?.aspect_ratio || cfg.default_aspect_ratio,
+      reference_images: options?.reference_images,
+      sample_count: options?.sample_count || cfg.default_sample_count,
+      seed: options?.seed,
+      model: cfg.model,
+      vertex_project: cfg.vertex_project,
+      vertex_location: cfg.vertex_location || 'global',
+      vertex_credentials: cfg.vertex_credentials,
+    }),
+  });
+
+  const responseText = await response.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: { images?: string[]; error?: string };
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error(`Image gen server error (${response.status}): ${responseText.slice(0, 200)}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Image generation failed');
+  }
+
+  return data.images || [];
 }
