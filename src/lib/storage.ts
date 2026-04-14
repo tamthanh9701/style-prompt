@@ -265,6 +265,17 @@ export async function callAI(
     }),
   });
 
+  const extractJsonBlock = (text: string) => {
+    // Strip markdown JSON block
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    try {
+      if (match && match[1]) return JSON.parse(match[1]);
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
+
   const responseText = await response.text();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: { result?: any; error?: string; raw?: boolean };
