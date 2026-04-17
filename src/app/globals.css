@@ -1375,3 +1375,31 @@ body::before {
   color: var(--text-tertiary);
   margin-bottom: 20px;
 }
+
+/* ============================================================
+   Animations
+   ============================================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}

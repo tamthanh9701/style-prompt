@@ -190,18 +190,22 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allResults: string[] = [];
 
-  // Generate sample_count images (API may return 1 at a time for preview models)
-  const numRequests = Math.min(sample_count, 4);
+  // Generate images — each API call may return multiple images
+  // We keep calling until we have enough or run out of requests
+  const maxRequests = Math.min(sample_count, 4);
 
-  for (let i = 0; i < numRequests; i++) {
+  for (let i = 0; i < maxRequests; i++) {
+    // Stop if we already have enough images
+    if (allResults.length >= sample_count) break;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parts: any[] = [
       { text: fullPrompt },
     ];
 
     // Add reference style images
-    // Sort original refs before generated refs (if they were tagged, UI handles it, here we just take the array)
-    for (const refImg of references.slice(0, 4)) { // Max 4 ref images total
+    console.log(`[IMAGEN] Request ${i + 1}/${maxRequests}: attaching ${references.length} reference images`);
+    for (const refImg of references.slice(0, 4)) {
       const { base64, mediaType } = extractBase64(refImg);
       parts.push({
         inlineData: { mimeType: mediaType, data: base64 },
@@ -224,6 +228,7 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
       },
     };
 
+    console.log(`[IMAGEN] Request ${i + 1}/${maxRequests}: calling Vertex AI...`);
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -239,19 +244,21 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
     }
 
     const data = await response.json();
-    console.log(`[IMAGEN] Response received, candidates: ${data?.candidates?.length || 0}`);
+    console.log(`[IMAGEN] Request ${i + 1}: response received, candidates: ${data?.candidates?.length || 0}`);
 
-    // Extract image parts from response
+    // Extract image parts from response — but ONLY take what we still need
     const candidate = data?.candidates?.[0];
     if (!candidate?.content?.parts) {
-      console.warn('[IMAGEN] No content parts in response');
+      console.warn(`[IMAGEN] Request ${i + 1}: no content parts in response`);
       continue;
     }
 
     for (const part of candidate.content.parts) {
+      if (allResults.length >= sample_count) break; // Enforce limit
       if (part.inlineData?.data && part.inlineData?.mimeType) {
         const dataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         allResults.push(dataUrl);
+        console.log(`[IMAGEN] Collected image ${allResults.length}/${sample_count}`);
       }
     }
   }
@@ -260,6 +267,7 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
     throw new Error('No images were generated. The model may have filtered the request or the response format was unexpected.');
   }
 
+  console.log(`[IMAGEN] Done — total ${allResults.length} images generated`);
   return allResults;
 }
 

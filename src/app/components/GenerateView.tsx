@@ -37,6 +37,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   const [refRecords, setRefRecords] = useState<RefImageRecord[]>([]);
   const [selectedRefIds, setSelectedRefIds] = useState<Set<string>>(new Set());
   const [viewerImage, setViewerImage] = useState<GenImageRecord | null>(null);
+  const [genProgress, setGenProgress] = useState<string[]>([]);
   const [adHocRefs, setAdHocRefs] = useState<{ id: string; data: string; mimeType: string }[]>([]);
 
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
@@ -119,9 +120,13 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setGenProgress([]);
     try {
+      setGenProgress(p => [...p, locale === 'vi' ? '✨ Đang chuẩn bị prompt...' : '✨ Preparing prompt...']);
       const flatStyle = flattenPrompt(style.prompt as PromptSchema);
       const selectedLibRefs = refRecords.filter(r => selectedRefIds.has(r.id));
+
+      setGenProgress(p => [...p, locale === 'vi' ? `🖼️ Đang phân tích ${selectedLibRefs.length + adHocRefs.length} ảnh tham chiếu...` : `🖼️ Analyzing ${selectedLibRefs.length + adHocRefs.length} reference images...`]);
       const b64SelectedLibRefs = await Promise.all(selectedLibRefs.map(r => blobToBase64(r.data)));
       const b64Refs = [...b64SelectedLibRefs, ...adHocRefs.map(r => r.data)].slice(0, 4);
 
@@ -130,6 +135,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
         if (contentItems.length === 0) {
           showToast(locale === 'vi' ? 'Vui lòng thêm ít nhất 1 item' : 'Please add at least 1 item', 'warning');
           setGenerating(false);
+          setGenProgress([]);
           return;
         }
         promptIdea = `game asset sheet containing ${contentItems.length} items. The items are:\n${contentItems.map((item, i) => `${i + 1}. ${item}`).join('\n')}`;
@@ -137,6 +143,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
         if (!contentIdea.trim()) {
           showToast(locale === 'vi' ? 'Vui lòng nhập ý tưởng nội dung' : 'Please enter a content idea', 'warning');
           setGenerating(false);
+          setGenProgress([]);
           return;
         }
         promptIdea = contentIdea;
@@ -150,12 +157,22 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
         CONTENT: promptIdea
       };
 
+      setGenProgress(p => [...p, locale === 'vi'
+        ? `🚀 Gửi yêu cầu đến AI (${sampleCount} ảnh, ${aspectRatio})...`
+        : `🚀 Sending request to AI (${sampleCount} images, ${aspectRatio})...`
+      ]);
+
       const imagesB64 = await callImageGen(settings, payload, {
         negative_prompt: negativePrompt,
         aspect_ratio: aspectRatio,
         sample_count: sampleCount,
         reference_images: b64Refs
       });
+
+      setGenProgress(p => [...p, locale === 'vi'
+        ? `✅ Nhận được ${imagesB64.length} ảnh! Đang lưu vào thư viện...`
+        : `✅ Received ${imagesB64.length} images! Saving to library...`
+      ]);
 
       const newRecords: GenImageRecord[] = imagesB64.map(b64 => ({
         id: `gen_${generateId()}`,
@@ -176,11 +193,14 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
 
       // Reload from DB to avoid duplicates
       await reloadImages();
+      setGenProgress(p => [...p, locale === 'vi' ? '🎉 Hoàn tất!' : '🎉 Done!']);
       showToast(locale === 'vi' ? `Tạo thành công ${imagesB64.length} ảnh!` : `Generated ${imagesB64.length} images!`);
     } catch (err: any) {
       showToast(err.message || 'Generation failed', 'error');
     } finally {
       setGenerating(false);
+      // Clear progress after a delay so user can see the final state
+      setTimeout(() => setGenProgress([]), 3000);
     }
   };
 
@@ -428,6 +448,20 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           </div>
         </div>
 
+        {/* ── GENERATION PROGRESS ── */}
+        {genProgress.length > 0 && (
+          <div style={{ maxWidth: '800px', width: '100%', margin: '16px auto 0', padding: '16px 20px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)' }}>
+            {genProgress.map((step, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', fontSize: '13px', color: i === genProgress.length - 1 ? 'var(--text-primary)' : 'var(--text-tertiary)', transition: 'color 200ms ease' }}>
+                <span>{step}</span>
+                {i === genProgress.length - 1 && generating && (
+                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', animation: 'pulse 1.2s infinite' }} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ── PROMPT REFINE PANEL ── */}
         <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto' }}>
           <PromptRefinePanel
@@ -460,8 +494,8 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                   key={img.id}
                   onClick={() => setViewerImage(img)}
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 120ms ease', position: 'relative' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)')}
                 >
                   <img src={renderObjUrl(img.data)} style={{ width: '100%', height: 'auto', display: 'block' }} alt="Gen result" />
                   <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '6px', display: 'flex', opacity: 0.6 }}>
