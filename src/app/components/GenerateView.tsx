@@ -17,6 +17,10 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   onRequestEdit?: (imageId: string) => void;
 }) {
   const [contentIdea, setContentIdea] = useState<string>('');
+  const [contentMode, setContentMode] = useState<'multi-item' | 'freeform'>('multi-item');
+  const [contentItems, setContentItems] = useState<string[]>([]);
+  const [newItemText, setNewItemText] = useState('');
+
   const [cameraAngle, setCameraAngle] = useState<string>('');
   const [dominantColor, setDominantColor] = useState<string>('');
   const [negativePrompt, setNegativePrompt] = useState<string>(
@@ -98,12 +102,22 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
     }
   };
 
-  const handleGenerate = async () => {
-    if (!contentIdea.trim()) {
-      showToast(locale === 'vi' ? 'Vui lòng nhập ý tưởng nội dung (CONTENT)' : 'Please enter a content idea', 'warning');
+  const handleAddItem = () => {
+    const val = newItemText.trim();
+    if (!val) return;
+    if (contentItems.length >= 10) {
+      showToast(locale === 'vi' ? 'Tối đa 10 items' : 'Max 10 items allowed', 'warning');
       return;
     }
+    setContentItems(prev => [...prev, val]);
+    setNewItemText('');
+  };
 
+  const handleRemoveItem = (index: number) => {
+    setContentItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleGenerate = async () => {
     setGenerating(true);
     try {
       const flatStyle = flattenPrompt(style.prompt as PromptSchema);
@@ -112,7 +126,23 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       const b64SelectedLibRefs = await Promise.all(selectedLibRefs.map(r => blobToBase64(r.data)));
       const b64Refs = [...b64SelectedLibRefs, ...adHocRefs.map(r => r.data)].slice(0, 4);
 
-      let promptIdea = contentIdea;
+      let promptIdea = '';
+      if (contentMode === 'multi-item') {
+        if (contentItems.length === 0) {
+          showToast(locale === 'vi' ? 'Vui lòng thêm ít nhất 1 item' : 'Please add at least 1 item', 'warning');
+          setGenerating(false);
+          return;
+        }
+        promptIdea = `game asset sheet containing ${contentItems.length} items. The items are:\n${contentItems.map((item, i) => `${i + 1}. ${item}`).join('\n')}`;
+      } else {
+        if (!contentIdea.trim()) {
+          showToast(locale === 'vi' ? 'Vui lòng nhập ý tưởng nội dung' : 'Please enter a content idea', 'warning');
+          setGenerating(false);
+          return;
+        }
+        promptIdea = contentIdea;
+      }
+
       if (cameraAngle.trim()) promptIdea += `\n[CAMERA ANGLE] ${cameraAngle.trim()}`;
       if (dominantColor.trim()) promptIdea += `\n[DOMINANT COLOR] ${dominantColor.trim()}`;
 
@@ -235,15 +265,55 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           </div>
 
           <div className="card" style={{ border: '2px solid var(--accent-primary)' }}>
-            <label className="form-label" style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>[CONTENT IDEA] <Sparkles size={18} /></label>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>What subjects/items do you want to draw in this style?</p>
-            <textarea
-              className="form-input"
-              placeholder="A futuristic cybernetic dog sitting on a neon-lit couch..."
-              rows={4}
-              value={contentIdea}
-              onChange={(e) => setContentIdea(e.target.value)}
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+              <div>
+                <label className="form-label" style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>[CONTENT IDEA] <Sparkles size={18} /></label>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>What subjects/items do you want to draw in this style?</p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-glass)', padding: '4px', borderRadius: '8px', cursor: 'pointer' }}>
+                <div onClick={() => setContentMode('multi-item')} style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', background: contentMode === 'multi-item' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'multi-item' ? '#fff' : 'var(--text-secondary)' }}>Multi-Item</div>
+                <div onClick={() => setContentMode('freeform')} style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', background: contentMode === 'freeform' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'freeform' ? '#fff' : 'var(--text-secondary)' }}>Free-form</div>
+              </div>
+            </div>
+
+            {contentMode === 'freeform' ? (
+              <textarea
+                className="form-input"
+                placeholder="A futuristic cybernetic dog sitting on a neon-lit couch..."
+                rows={4}
+                value={contentIdea}
+                onChange={(e) => setContentIdea(e.target.value)}
+              />
+            ) : (
+              <div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                  {contentItems.map((item, idx) => (
+                    <div key={idx} style={{ background: 'var(--bg-tertiary)', borderRadius: '999px', padding: '4px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-color)' }}>
+                      <span>{item}</span>
+                      <button className="btn-sm" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: 0, cursor: 'pointer', lineHeight: 1 }} onClick={() => handleRemoveItem(idx)}>✕</button>
+                    </div>
+                  ))}
+                  {contentItems.length === 0 && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 0' }}>No items added yet. Example: "Iron Sword", "Health Potion".</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ flex: 1, marginBottom: 0 }}
+                    placeholder="e.g. Health Potion"
+                    value={newItemText}
+                    onChange={e => setNewItemText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddItem(); } }}
+                    disabled={contentItems.length >= 10}
+                  />
+                  <button className="btn btn-secondary" onClick={handleAddItem} disabled={contentItems.length >= 10 || !newItemText.trim()}>+ Add</button>
+                  <span style={{ fontSize: '0.75rem', color: contentItems.length >= 10 ? 'var(--accent-danger)' : 'var(--text-muted)', minWidth: '35px', textAlign: 'right' }}>{contentItems.length}/10</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="card">

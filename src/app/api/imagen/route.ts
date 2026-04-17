@@ -177,6 +177,11 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
 
   const aspectHint = aspectRatioToPrompt(aspect_ratio);
   let fullPrompt = `[MANDATORY STYLE INSTRUCTIONS]\n${MANDATORY_STYLE}\n\n[CONTENT IDEA]\n${CONTENT}\n\nGenerate this image with ${aspectHint}.`;
+
+  if (CONTENT.includes('game asset sheet')) {
+    fullPrompt += `\n\n[SPATIAL LAYOUT RULES]\n- Arrange all items in a clean grid or evenly spaced layout.\n- Each item must be ISOLATED with clear white/transparent space between them.\n- Do NOT overlap, merge, or blend any items together.\n- Treat each item as an independent sprite that could be individually cropped.\n- Maintain consistent scale across all items.\n- Use a plain or minimal background to maximize asset usability.`;
+  }
+
   if (negative_prompt) {
     fullPrompt += `\n\nAvoid: ${negative_prompt}`;
   }
