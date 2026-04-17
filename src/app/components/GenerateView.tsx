@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { StyleLibrary, AppSettings, PromptSchema } from '@/types';
 import { type Locale, t } from '@/lib/i18n';
 import { callImageGen, generateId, fileToBase64 } from '@/lib/storage';
 import { saveGenImage, getGenImages, getRefImages, putRefImage, type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
 import { flattenPrompt } from '@/types';
 import PromptRefinePanel from '@/app/components/PromptRefinePanel';
-import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud, Settings2, ChevronDown, ChevronUp, ImageIcon, X, ArrowLeft } from 'lucide-react';
+import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud, Settings2, ChevronDown, ChevronUp, ImageIcon, X, ArrowLeft, ZoomIn, Maximize2 } from 'lucide-react';
 
 export default function GenerateView({ style, settings, locale, onBack, onUpdate, showToast, onRequestEdit }: {
   style: StyleLibrary;
@@ -34,12 +34,17 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
 
   const [generating, setGenerating] = useState(false);
   const [genImages, setGenImages] = useState<GenImageRecord[]>([]);
-
   const [refRecords, setRefRecords] = useState<RefImageRecord[]>([]);
   const [selectedRefIds, setSelectedRefIds] = useState<Set<string>>(new Set());
+  const [viewerImage, setViewerImage] = useState<GenImageRecord | null>(null);
   const [adHocRefs, setAdHocRefs] = useState<{ id: string; data: string; mimeType: string }[]>([]);
 
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+
+  const reloadImages = useCallback(async () => {
+    const gImgs = await getGenImages(style.id);
+    setGenImages(gImgs);
+  }, [style.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,7 +174,8 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
         await saveGenImage(rec);
       }
 
-      setGenImages(prev => [...newRecords, ...prev]);
+      // Reload from DB to avoid duplicates
+      await reloadImages();
       showToast(locale === 'vi' ? `Tạo thành công ${imagesB64.length} ảnh!` : `Generated ${imagesB64.length} images!`);
     } catch (err: any) {
       showToast(err.message || 'Generation failed', 'error');
@@ -450,28 +456,19 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
               {genImages.map(img => (
-                <div key={img.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-primary)', borderRadius: '12px', overflow: 'hidden', transition: 'all 0.3s ease' }}>
-                  <img src={renderObjUrl(img.data)} style={{ width: '100%', height: 'auto', display: 'block', background: 'var(--bg-tertiary)' }} alt="Gen result" />
+                <div
+                  key={img.id}
+                  onClick={() => setViewerImage(img)}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 120ms ease', position: 'relative' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
+                >
+                  <img src={renderObjUrl(img.data)} style={{ width: '100%', height: 'auto', display: 'block' }} alt="Gen result" />
+                  <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '6px', display: 'flex', opacity: 0.6 }}>
+                    <Maximize2 size={14} color="#F2F2F0" />
+                  </div>
                   <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(img.createdAt).toLocaleTimeString()}</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {onRequestEdit && (
-                        <button className="btn btn-sm" style={{ padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-primary)', borderRadius: '6px' }} onClick={() => onRequestEdit(img.id)} title="Edit">
-                          <PenTool size={12} />
-                        </button>
-                      )}
-                      <button className="btn btn-sm" style={{ padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-primary)', borderRadius: '6px', color: 'var(--accent-primary)' }} onClick={() => {
-                        const a = document.createElement('a');
-                        a.href = renderObjUrl(img.data);
-                        a.download = `style-gen-${img.id}.jpg`;
-                        a.click();
-                      }} title="Download">
-                        <DownloadCloud size={12} />
-                      </button>
-                      <button className="btn btn-sm" style={{ padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-primary)', borderRadius: '6px', color: 'var(--accent-warning)' }} onClick={() => handlePromote(img)} title="Promote">
-                        <Star size={12} />
-                      </button>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -479,6 +476,78 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           )}
         </div>
       </div>
+
+      {/* ── IMAGE VIEWER MODAL ── */}
+      {viewerImage && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 200ms ease-out' }}
+          onClick={() => setViewerImage(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setViewerImage(null)}
+              style={{ position: 'absolute', top: '-40px', right: '0', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px', zIndex: 10 }}
+            >
+              <X size={24} />
+            </button>
+
+            {/* Image */}
+            <img
+              src={renderObjUrl(viewerImage.data)}
+              style={{ maxWidth: '100%', maxHeight: 'calc(90vh - 80px)', objectFit: 'contain', borderRadius: 'var(--radius-lg)' }}
+              alt="Full view"
+            />
+
+            {/* Action Bar */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'var(--surface-2)', padding: '12px 24px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-default)' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginRight: '8px' }}>
+                {new Date(viewerImage.createdAt).toLocaleString()} · {viewerImage.aspectRatio || '1:1'}
+              </span>
+
+              {/* Download */}
+              <button
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = renderObjUrl(viewerImage.data);
+                  a.download = `style-gen-${viewerImage.id}.jpg`;
+                  a.click();
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', transition: 'background 120ms ease' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-3)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <DownloadCloud size={15} /> {locale === 'vi' ? 'Tải xuống' : 'Download'}
+              </button>
+
+              {/* Edit */}
+              {onRequestEdit && (
+                <button
+                  onClick={() => { setViewerImage(null); onRequestEdit(viewerImage.id); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', transition: 'background 120ms ease' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-3)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <PenTool size={15} /> {locale === 'vi' ? 'Chỉnh sửa' : 'Edit'}
+                </button>
+              )}
+
+              {/* Promote to Ref */}
+              <button
+                onClick={() => { handlePromote(viewerImage); setViewerImage(null); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent-muted)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--accent)', cursor: 'pointer', fontSize: '13px', fontWeight: 500, transition: 'background 120ms ease' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-muted)'; e.currentTarget.style.color = 'var(--accent)'; }}
+              >
+                <Star size={15} /> {locale === 'vi' ? 'Dùng làm Ref' : 'Use as Ref'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
