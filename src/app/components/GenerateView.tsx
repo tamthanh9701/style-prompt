@@ -34,6 +34,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   const [aspectRatio, setAspectRatio] = useState<string>('1:1');
   const [sampleCount, setSampleCount] = useState<number>(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [refsExpanded, setRefsExpanded] = useState(false);
 
   const [generating, setGenerating] = useState(false);
   const [genImages, setGenImages] = useState<GenImageRecord[]>([]);
@@ -381,24 +382,76 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                 </div>
               )}
 
-              {/* Reference Images inline preview */}
+              {/* ── Expandable Reference Images ── */}
               {(refRecords.length > 0 || adHocRefs.length > 0) && (
-                <div style={{ display: 'flex', gap: '6px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)', alignItems: 'center', overflowX: 'auto' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0, marginRight: '4px' }}>Refs</span>
-                  {refRecords.map(r => {
-                    const isSel = selectedRefIds.has(r.id);
-                    return (
-                      <div key={r.id} onClick={() => handleRefToggle(r.id)} style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0, cursor: 'pointer', borderRadius: '4px', overflow: 'hidden', border: isSel ? '2px solid #714DE8' : '2px solid transparent', opacity: isSel ? 1 : 0.4, transition: 'all 0.2s' }}>
-                        <img src={renderObjUrl(r.data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="ref" />
-                      </div>
-                    );
-                  })}
-                  {adHocRefs.map(r => (
-                    <div key={r.id} style={{ position: 'relative', width: '32px', height: '32px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '2px solid #FF5A5F' }}>
-                      <img src={r.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="adhoc" />
-                      <button onClick={(e) => { e.stopPropagation(); handeRemoveAdHoc(r.id); }} style={{ position: 'absolute', top: -1, right: -1, background: '#FF5A5F', color: '#fff', fontSize: '8px', width: '12px', height: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>✕</button>
+                <div style={{ marginTop: '10px', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
+                  {/* Header row — always visible */}
+                  <button
+                    onClick={() => setRefsExpanded(p => !p)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 0', color: 'var(--text-secondary)' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Refs</span>
+                      <span style={{ fontSize: '0.7rem', background: 'var(--surface-3)', borderRadius: '999px', padding: '1px 7px', color: 'var(--text-muted)' }}>
+                        {refRecords.length + adHocRefs.length}
+                      </span>
+                      {/* Collapsed thumb strip */}
+                      {!refsExpanded && (
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[...refRecords.slice(0, 5), ...adHocRefs.slice(0, Math.max(0, 5 - refRecords.length))].map((r, i) => (
+                            <div key={i} style={{ width: '22px', height: '22px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-default)', flexShrink: 0 }}>
+                              <img src={'data' in r ? (r as any).data : renderObjUrl((r as any).data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                            </div>
+                          ))}
+                          {refRecords.length + adHocRefs.length > 5 && (
+                            <div style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                              +{refRecords.length + adHocRefs.length - 5}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    {refsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+
+                  {/* Expanded grid */}
+                  {refsExpanded && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: '8px', marginTop: '10px' }}>
+                      {refRecords.map(r => {
+                        const isSel = selectedRefIds.has(r.id);
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => handleRefToggle(r.id)}
+                            style={{
+                              position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden',
+                              cursor: 'pointer', border: isSel ? '2px solid var(--accent)' : '2px solid transparent',
+                              opacity: isSel ? 1 : 0.45, transition: 'all 0.18s',
+                              boxShadow: isSel ? '0 0 0 3px rgba(66,133,244,0.25)' : 'none'
+                            }}
+                          >
+                            <img src={renderObjUrl(r.data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="ref" />
+                            {isSel && (
+                              <div style={{ position: 'absolute', top: 4, right: 4, background: 'var(--accent)', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Star size={9} color="#fff" fill="#fff" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {adHocRefs.map(r => (
+                        <div key={r.id} style={{ position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--accent-danger)' }}>
+                          <img src={r.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="adhoc" />
+                          <button
+                            onClick={e => { e.stopPropagation(); handeRemoveAdHoc(r.id); }}
+                            style={{ position: 'absolute', top: 3, right: 3, background: 'var(--accent-danger)', color: '#fff', border: 'none', cursor: 'pointer', width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                          >
+                            <X size={9} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -412,38 +465,50 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                     {contentMode === 'freeform' ? 'Free-form' : 'Multi-Item'}
                   </button>
 
-                  {/* Auto-suggest Aspect Ratio wrapper */}
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ padding: '4px 6px', fontSize: '0.75rem', color: 'var(--text-secondary)', borderRight: '1px solid var(--border-default)', display: 'flex', alignItems: 'center' }}><Settings2 size={12} /></div>
+                  {/* Aspect Ratio */}
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--surface-3)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '3px 6px 3px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    <Settings2 size={11} />
                     <select
                       value={aspectRatio} onChange={e => setAspectRatio(e.target.value)}
-                      style={{ background: 'var(--surface-1)', border: 'none', padding: '4px 8px', fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', outline: 'none', fontWeight: 500 }}>
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', paddingRight: '14px' }}
+                    >
                       <option value="1:1">1:1</option>
                       <option value="16:9">16:9</option>
                       <option value="9:16">9:16</option>
                       <option value="3:2">3:2</option>
                     </select>
+                    <ChevronDown size={10} style={{ position: 'absolute', right: 6, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
                   </div>
 
-                  <select
-                    value={sampleCount} onChange={e => setSampleCount(Number(e.target.value))}
-                    style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', outline: 'none', fontWeight: 500 }}>
-                    <option value={1}>Count: 1</option>
-                    <option value={2}>Count: 2</option>
-                    <option value={4}>Count: 4</option>
-                  </select>
+                  {/* Count */}
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', background: 'var(--surface-3)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '3px 6px 3px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <select
+                      value={sampleCount} onChange={e => setSampleCount(Number(e.target.value))}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', paddingRight: '14px' }}
+                    >
+                      <option value={1}>× 1</option>
+                      <option value={2}>× 2</option>
+                      <option value={4}>× 4</option>
+                    </select>
+                    <ChevronDown size={10} style={{ position: 'absolute', right: 6, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
+                  </div>
 
-                  <select
-                    value={cameraAngle} onChange={e => setCameraAngle(e.target.value)}
-                    style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', color: 'var(--text-primary)', cursor: 'pointer', outline: 'none', fontWeight: 500 }}>
-                    <option value="">Angle: Default</option>
-                    <option value="Isometric">Isometric</option>
-                    <option value="Low Angle">Low Angle</option>
-                    <option value="Eye-Level">Eye-Level</option>
-                    <option value="Top-Down">Top-Down</option>
-                    <option value="Bird's Eye">Bird's Eye</option>
-                    <option value="3/4 View">3/4 View</option>
-                  </select>
+                  {/* Camera Angle */}
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', background: 'var(--surface-3)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '3px 6px 3px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <select
+                      value={cameraAngle} onChange={e => setCameraAngle(e.target.value)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', paddingRight: '14px' }}
+                    >
+                      <option value="">Angle</option>
+                      <option value="Isometric">Isometric</option>
+                      <option value="Low Angle">Low Angle</option>
+                      <option value="Eye-Level">Eye-Level</option>
+                      <option value="Top-Down">Top-Down</option>
+                      <option value="Bird's Eye">Bird's Eye</option>
+                      <option value="3/4 View">3/4 View</option>
+                    </select>
+                    <ChevronDown size={10} style={{ position: 'absolute', right: 6, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
+                  </div>
 
                   <label style={{ background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: 500 }}>
                     <Paperclip size={12} style={{ marginRight: 4 }} /> Attach
