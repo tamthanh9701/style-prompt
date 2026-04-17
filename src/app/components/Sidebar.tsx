@@ -15,7 +15,7 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
   return (
     <div className="app-sidebar">
       <div className="sidebar-header">
-        <div className="sidebar-logo"><Sparkles size={18} color="white" /></div>
+        <div className="sidebar-logo"><Sparkles size={18} color="#3DDC97" /></div>
         <div className="sidebar-title">StyleLibrary</div>
       </div>
 
@@ -52,15 +52,15 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
       </div>
 
       <div className="sidebar-footer">
-        <div style={{ display: 'flex', gap: '8px', padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)' }}>
+        <div style={{ display: 'flex', gap: '8px', padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)' }}>
           <button
-            style={{ flex: 1, padding: '4px', background: locale === 'en' ? 'var(--bg-glass-hover)' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'en' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}
+            style={{ flex: 1, padding: '4px', background: locale === 'en' ? 'var(--surface-3)' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'en' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}
             onClick={() => setLocale('en')}
           >
             EN
           </button>
           <button
-            style={{ flex: 1, padding: '4px', background: locale === 'vi' ? 'var(--bg-glass-hover)' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'vi' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}
+            style={{ flex: 1, padding: '4px', background: locale === 'vi' ? 'var(--surface-3)' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'vi' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}
             onClick={() => setLocale('vi')}
           >
             VI
