@@ -272,7 +272,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           style={
             inputLayout === 'sidebar'
               ? {
-                width: '320px',
+                width: '600px',
                 height: '100%',
                 borderRight: '1px solid var(--border-subtle)',
                 display: 'flex',
