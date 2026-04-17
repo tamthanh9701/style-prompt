@@ -7,12 +7,13 @@ import { fileToBase64 } from '@/lib/storage';
 import FieldInput from '@/app/components/FieldInput';
 import { Download, Upload, Save, Sparkles, List, Image as ImageIcon, Plus, Camera, Trash2 } from 'lucide-react';
 
-export default function EditStyleView({ style, settings, locale, onBack, onUpdate, onGenerate, showToast }: {
+export default function EditStyleView({ style, settings, locale, onBack, onUpdate, onDelete, onGenerate, showToast }: {
   style: StyleLibrary;
   settings: AppSettings;
   locale: Locale;
   onBack: () => void;
   onUpdate: (id: string, updates: Partial<StyleLibrary>) => void;
+  onDelete: (id: string) => void;
   onGenerate: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
 }) {
@@ -186,6 +187,7 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {isDirty && <span style={{ color: 'var(--accent-warning)', alignSelf: 'center', fontSize: '0.9rem', marginRight: '8px' }}>• Unsaved</span>}
+          <button className="btn btn-secondary" onClick={() => { if (confirm(locale === 'vi' ? 'Bạn có chắc muốn xóa Style này vĩnh viễn?' : 'Delete this style permanently?')) onDelete(style.id); }} style={{ color: 'var(--accent-danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}><Trash2 size={16} /></button>
           <button className="btn btn-secondary" onClick={handleExportJson}><Download size={16} /> {locale === 'vi' ? 'Xuất JSON' : 'Export JSON'}</button>
           <label className="btn btn-secondary" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
             <Upload size={16} /> {locale === 'vi' ? 'Nhập JSON' : 'Import JSON'}
@@ -196,10 +198,10 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px' }}>
-        <button className={`tab-btn ${activeTab === 'schema' ? 'active' : ''}`} onClick={() => setActiveTab('schema')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><List size={16} /> Style Schema</button>
-        <button className={`tab-btn ${activeTab === 'images' ? 'active' : ''}`} onClick={() => setActiveTab('images')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ImageIcon size={16} /> Ref Images ({refRecords.length})</button>
+      {/* Tabs - Stitch Pill UI */}
+      <div style={{ display: 'inline-flex', background: 'var(--bg-tertiary)', padding: '6px', borderRadius: '12px', marginBottom: '24px', gap: '4px', alignSelf: 'flex-start' }}>
+        <button className="btn" onClick={() => setActiveTab('schema')} style={{ border: 'none', background: activeTab === 'schema' ? 'var(--bg-glass-hover)' : 'transparent', color: activeTab === 'schema' ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: 'none' }}><List size={16} /> Style Schema</button>
+        <button className="btn" onClick={() => setActiveTab('images')} style={{ border: 'none', background: activeTab === 'images' ? 'var(--bg-glass-hover)' : 'transparent', color: activeTab === 'images' ? 'var(--text-primary)' : 'var(--text-secondary)', boxShadow: 'none' }}><ImageIcon size={16} /> Ref Images ({refRecords.length})</button>
       </div>
 
       {/* Tab Content */}
@@ -284,11 +286,17 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
                 {refRecords.map(r => (
                   <div key={r.id} className="card" style={{ padding: '8px', position: 'relative' }}>
                     <img src={imageUrls[r.id]} alt="Ref" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '4px' }} />
+                    {style.coverImageId === r.id && <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'var(--accent-primary)', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold' }}>👑 Cover</div>}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>{r.source === 'generated' ? <><Sparkles size={12} /> Gen</> : <><Camera size={12} /> Orig</>}</span>
-                      <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-danger)' }} onClick={() => handlePruneImage(r)}>
-                        <Trash2 size={14} /> Prune
-                      </button>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: style.coverImageId === r.id ? 'var(--text-primary)' : 'var(--text-secondary)' }} onClick={() => onUpdate(style.id, { coverImageId: r.id })}>
+                          Cover
+                        </button>
+                        <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-danger)' }} onClick={() => handlePruneImage(r)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

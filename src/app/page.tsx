@@ -44,7 +44,7 @@ export default function HomePage() {
     import('@/lib/storage').then(module => {
       module.migrateV1toV2().then((result) => {
         if (result && result.migrated > 0) {
-           setStyles(getStyles());
+          setStyles(getStyles());
         }
       });
     });
@@ -98,21 +98,21 @@ export default function HomePage() {
   return (
     <div className="app-shell">
       {/* Sidebar Navigation */}
-      <Sidebar 
-        currentView={view} 
+      <Sidebar
+        currentView={view}
         setView={(v) => {
           setView(v as View);
           if (v === 'library') setSelectedStyleId(null);
-        }} 
-        locale={locale} 
-        setLocale={switchLocale} 
+        }}
+        locale={locale}
+        setLocale={switchLocale}
       />
 
       {/* Main Content Area */}
       <div className="app-main fade-in">
         {view === 'library' && <LibraryView styles={styles} locale={locale} onSelect={(id) => { setSelectedStyleId(id); setView('edit'); }} onCreate={() => setView('create')} onDelete={handleDeleteStyle} />}
         {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
-        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onUpdate={handleUpdateStyle} onGenerate={() => setView('generate')} showToast={showToast} />}
+        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onDelete={handleDeleteStyle} onUpdate={handleUpdateStyle} onGenerate={() => setView('generate')} showToast={showToast} />}
         {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} onRequestEdit={(imageId) => { setSelectedImageId(imageId); setView('image_edit'); }} />}
         {view === 'image_edit' && selectedStyle && <ImageEditView style={selectedStyle} settings={settings} locale={locale} imageId={selectedImageId} onBack={() => setView('generate')} onUpdate={handleUpdateStyle} showToast={showToast} />}
         {view === 'logs' && <LogsView locale={locale} onBack={() => setView('library')} />}

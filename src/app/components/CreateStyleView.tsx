@@ -137,6 +137,8 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
             addedAt: new Date().toISOString()
           }));
           await idbSetRefImages(analysisResult.style.id, records);
+          // Auto assign the first uploaded image as the cover image
+          analysisResult.style.coverImageId = records[0].id;
         }
         onCreate(analysisResult.style);
       } catch (err) {

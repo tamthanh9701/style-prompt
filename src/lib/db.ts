@@ -7,7 +7,7 @@ export type { RefImageRecord, GenImageRecord, GenerationJob };
 // ============================================================
 
 const DB_NAME = 'style_prompt_library_db';
-const DB_VERSION = 2; // Bumped to 2 for v2 schema
+const DB_VERSION = 3; // Bumped to 3 to ensure indexes are created
 
 // Object stores
 const STORES = {
@@ -32,24 +32,44 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const tx = (event.target as IDBOpenDBRequest).transaction!;
 
       // Reference images store
+      let refStore: IDBObjectStore;
       if (!db.objectStoreNames.contains(STORES.REFERENCE_IMAGES)) {
-        const refStore = db.createObjectStore(STORES.REFERENCE_IMAGES, { keyPath: 'id' });
+        refStore = db.createObjectStore(STORES.REFERENCE_IMAGES, { keyPath: 'id' });
+      } else {
+        refStore = tx.objectStore(STORES.REFERENCE_IMAGES);
+      }
+      if (!refStore.indexNames.contains('libraryId')) {
         refStore.createIndex('libraryId', 'libraryId', { unique: false });
       }
 
       // Generated images store
+      let genStore: IDBObjectStore;
       if (!db.objectStoreNames.contains(STORES.GENERATED_IMAGES)) {
-        const genStore = db.createObjectStore(STORES.GENERATED_IMAGES, { keyPath: 'id' });
+        genStore = db.createObjectStore(STORES.GENERATED_IMAGES, { keyPath: 'id' });
+      } else {
+        genStore = tx.objectStore(STORES.GENERATED_IMAGES);
+      }
+      if (!genStore.indexNames.contains('libraryId')) {
         genStore.createIndex('libraryId', 'libraryId', { unique: false });
+      }
+      if (!genStore.indexNames.contains('jobId')) {
         genStore.createIndex('jobId', 'jobId', { unique: false });
       }
 
       // Generation jobs store
+      let jobStore: IDBObjectStore;
       if (!db.objectStoreNames.contains(STORES.GENERATION_JOBS)) {
-        const jobStore = db.createObjectStore(STORES.GENERATION_JOBS, { keyPath: 'id' });
+        jobStore = db.createObjectStore(STORES.GENERATION_JOBS, { keyPath: 'id' });
+      } else {
+        jobStore = tx.objectStore(STORES.GENERATION_JOBS);
+      }
+      if (!jobStore.indexNames.contains('libraryId')) {
         jobStore.createIndex('libraryId', 'libraryId', { unique: false });
+      }
+      if (!jobStore.indexNames.contains('createdAt')) {
         jobStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
