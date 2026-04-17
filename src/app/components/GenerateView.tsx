@@ -5,7 +5,7 @@ import { callImageGen, generateId, fileToBase64 } from '@/lib/storage';
 import { saveGenImage, getGenImages, getRefImages, putRefImage, type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
 import { flattenPrompt } from '@/types';
 import PromptRefinePanel from '@/app/components/PromptRefinePanel';
-import { Paperclip, Sparkles, Rocket, PenTool, Star } from 'lucide-react';
+import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud } from 'lucide-react';
 
 export default function GenerateView({ style, settings, locale, onBack, onUpdate, showToast, onRequestEdit }: {
   style: StyleLibrary;
@@ -17,6 +17,8 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   onRequestEdit?: (imageId: string) => void;
 }) {
   const [contentIdea, setContentIdea] = useState<string>('');
+  const [cameraAngle, setCameraAngle] = useState<string>('');
+  const [dominantColor, setDominantColor] = useState<string>('');
   const [negativePrompt, setNegativePrompt] = useState<string>(
     Array.isArray((style.prompt as any).negative_prompt)
       ? (style.prompt as any).negative_prompt.join(', ')
@@ -110,9 +112,13 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       const b64SelectedLibRefs = await Promise.all(selectedLibRefs.map(r => blobToBase64(r.data)));
       const b64Refs = [...b64SelectedLibRefs, ...adHocRefs.map(r => r.data)].slice(0, 4);
 
+      let promptIdea = contentIdea;
+      if (cameraAngle.trim()) promptIdea += `\n[CAMERA ANGLE] ${cameraAngle.trim()}`;
+      if (dominantColor.trim()) promptIdea += `\n[DOMINANT COLOR] ${dominantColor.trim()}`;
+
       const payload = {
         MANDATORY_STYLE: flatStyle.positive,
-        CONTENT: contentIdea
+        CONTENT: promptIdea
       };
 
       const imagesB64 = await callImageGen(settings, payload, {
@@ -241,6 +247,32 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           </div>
 
           <div className="card">
+            <h3 style={{ marginBottom: '12px', fontSize: '0.9rem', color: 'var(--accent-primary)', fontWeight: 'bold' }}>Optional Overrides</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Camera Angle</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Low angle, wide shot"
+                  value={cameraAngle}
+                  onChange={(e) => setCameraAngle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Dominant Color</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Neon Pink, Muted Grey"
+                  value={dominantColor}
+                  onChange={(e) => setDominantColor(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
             <label className="form-label">Negative Prompt</label>
             <textarea
               className="form-input"
@@ -303,12 +335,20 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(img.createdAt).toLocaleTimeString()}</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {onRequestEdit && (
-                        <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }} onClick={() => onRequestEdit(img.id)} title="Edit this image with prompts">
-                          <PenTool size={14} /> Edit
+                        <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }} onClick={() => onRequestEdit(img.id)} title="Edit this image with prompts">
+                          <PenTool size={14} />
                         </button>
                       )}
+                      <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }} onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = renderObjUrl(img.data);
+                        a.download = `style-gen-${img.id}.jpg`;
+                        a.click();
+                      }} title="Download Image">
+                        <DownloadCloud size={14} />
+                      </button>
                       <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-warning)', border: '1px solid var(--accent-warning)' }} onClick={() => handlePromote(img)} title="Mark as high-fidelity and use as a style reference">
-                        <Star size={14} /> Promote to Ref
+                        <Star size={14} />
                       </button>
                     </div>
                   </div>

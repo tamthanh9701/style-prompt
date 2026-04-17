@@ -158,7 +158,7 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
     references = [],
     settings,
   } = body;
-  
+
   const {
     model,
     vertex_project,
@@ -203,10 +203,13 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
       });
     }
 
-    // Add seed variation prompt if multiple images
-    if (i > 0) {
-      parts[0].text = `${fullPrompt}\n\nVariation ${i + 1} - create a unique but stylistically consistent composition.`;
-    }
+    // Include a runtime seed to force unique variations
+    const uniqueSeed = Math.floor(Math.random() * 10000000000);
+    const variationInstruction = i > 0
+      ? `\n\nVariation ${i + 1} - create a unique but stylistically consistent composition.`
+      : ``;
+
+    parts[0].text = `${fullPrompt}${variationInstruction}\n\n[SYSTEM RUNTIME SEED: ${uniqueSeed} - Ensure this generation strictly unique]`;
 
     const requestBody = {
       contents: [{ role: 'user', parts }],
