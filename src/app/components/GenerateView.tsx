@@ -16,6 +16,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
   onRequestEdit?: (imageId: string) => void;
 }) {
+  const [inputLayout, setInputLayout] = useState<'sidebar' | 'bottom'>('sidebar');
   const [contentIdea, setContentIdea] = useState<string>('');
   const [contentMode, setContentMode] = useState<'multi-item' | 'freeform'>('multi-item');
   const [contentItems, setContentItems] = useState<string[]>([]);
@@ -26,7 +27,9 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   const [negativePrompt, setNegativePrompt] = useState<string>(
     Array.isArray((style.prompt as any).negative_prompt)
       ? (style.prompt as any).negative_prompt.join(', ')
-      : ((style.prompt as any).negative_prompt || '')
+      : typeof (style.prompt as any).negative_prompt === 'string'
+        ? (style.prompt as any).negative_prompt
+        : ''
   );
   const [aspectRatio, setAspectRatio] = useState<string>('1:1');
   const [sampleCount, setSampleCount] = useState<number>(1);
@@ -258,293 +261,361 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   const hasContent = contentMode === 'multi-item' ? contentItems.length > 0 : contentIdea.trim().length > 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg-primary)' }}>
 
       {/* ── TOP BAR ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', flexShrink: 0, borderBottom: '1px solid var(--border-primary)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', flexShrink: 0, borderBottom: '1px solid var(--border-primary)', zIndex: 10, background: 'var(--surface-1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button className="btn btn-sm" onClick={onBack} style={{ border: 'none', padding: '6px' }}><ArrowLeft size={18} /></button>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{style.name}</span>
+        </div>
+
+        {/* Layout toggle */}
+        <div style={{ display: 'flex', background: 'var(--surface-2)', padding: '4px', borderRadius: '8px' }}>
+          <button
+            onClick={() => setInputLayout('sidebar')}
+            style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, border: 'none', borderRadius: '6px', background: inputLayout === 'sidebar' ? 'var(--surface-3)' : 'transparent', color: inputLayout === 'sidebar' ? 'var(--text-primary)' : 'var(--text-tertiary)', cursor: 'pointer', transition: 'all 0.2s' }}
+          >Sidebar</button>
+          <button
+            onClick={() => setInputLayout('bottom')}
+            style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, border: 'none', borderRadius: '6px', background: inputLayout === 'bottom' ? 'var(--surface-3)' : 'transparent', color: inputLayout === 'bottom' ? 'var(--text-primary)' : 'var(--text-tertiary)', cursor: 'pointer', transition: 'all 0.2s' }}
+          >Bottom</button>
         </div>
       </div>
 
-      {/* ── MAIN CONTENT AREA ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+      {/* ── FLEXIBLE MAIN CONTENT AREA ── */}
+      <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
 
-        {/* ── HERO: CONTENT IDEA INPUT ── */}
-        <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto', padding: '32px 0' }}>
+        {/* ── INPUT PANEL (Sidebar or Bottom) ── */}
+        <div
+          className="custom-scrollbar"
+          style={
+            inputLayout === 'sidebar'
+              ? {
+                width: '380px',
+                height: '100%',
+                borderRight: '1px solid var(--border-primary)',
+                padding: '24px',
+                overflowY: 'auto',
+                background: 'var(--surface-1)',
+                display: 'flex',
+                flexDirection: 'column',
+                flexShrink: 0,
+                position: 'relative',
+                zIndex: 10
+              }
+              : {
+                position: 'absolute',
+                bottom: '24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 'calc(100% - 48px)',
+                maxWidth: '800px',
+                maxHeight: '70vh',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '20px 24px',
+                overflowY: 'auto',
+                background: 'rgba(20, 20, 22, 0.85)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 50,
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+              }
+          }
+        >
+          <div style={{ maxWidth: inputLayout === 'bottom' ? '800px' : '100%', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Welcome/Instruction */}
-          {genImages.length === 0 && !generating && (
-            <div style={{ textAlign: 'center', marginBottom: '32px', animation: 'fadeIn 0.5s ease-out' }}>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {locale === 'vi' ? 'Bạn muốn tạo gì hôm nay?' : 'What do you want to create?'}
-              </h2>
-            </div>
-          )}
-
-          {/* Suggestion Chips */}
-          {genImages.length === 0 && !generating && !hasContent && (
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '24px' }}>
-              {[
-                locale === 'vi' ? 'Kiếm sắt cổ đại' : 'An ancient iron sword',
-                locale === 'vi' ? 'Bình thuốc hồi máu' : 'A healing potion bottle',
-                locale === 'vi' ? 'Tháp canh trung cổ' : 'A medieval watchtower',
-              ].map((s, i) => (
-                <button
-                  key={i}
-                  className="btn btn-sm"
-                  style={{ borderRadius: '999px', background: 'var(--bg-glass)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', fontSize: '0.8rem' }}
-                  onClick={() => {
-                    if (contentMode === 'multi-item') {
-                      setContentItems([s]);
-                    } else {
-                      setContentIdea(s);
-                    }
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* ── THE MAIN GLASS INPUT BOX ── */}
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border-primary)',
-              borderRadius: '24px',
-              padding: '24px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            {/* Mode Toggle inside input box */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-glass)', padding: '3px', borderRadius: '8px' }}>
-                <div onClick={() => setContentMode('multi-item')} style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, background: contentMode === 'multi-item' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'multi-item' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}>Multi-Item</div>
-                <div onClick={() => setContentMode('freeform')} style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, background: contentMode === 'freeform' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'freeform' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}>Free-form</div>
-              </div>
-            </div>
-
-            {/* Input Area */}
-            {contentMode === 'freeform' ? (
-              <textarea
-                placeholder={locale === 'vi' ? 'Mô tả chi tiết ý tưởng của bạn...' : 'Describe your content idea in detail...'}
-                rows={3}
-                value={contentIdea}
-                onChange={(e) => setContentIdea(e.target.value)}
-                style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.1rem', outline: 'none', resize: 'none', minHeight: '60px', fontFamily: 'inherit', lineHeight: 1.6 }}
-              />
-            ) : (
-              <div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: contentItems.length > 0 ? '12px' : '0' }}>
-                  {contentItems.map((item, idx) => (
-                    <div key={idx} style={{ background: 'rgba(26,115,232,0.1)', border: '1px solid rgba(26,115,232,0.2)', borderRadius: '999px', padding: '6px 14px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', animation: 'fadeIn 0.2s ease-out' }}>
-                      <span>{item}</span>
-                      <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: 0, cursor: 'pointer', lineHeight: 1, display: 'flex' }} onClick={() => handleRemoveItem(idx)}><X size={14} /></button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    placeholder={locale === 'vi' ? 'Thêm item (VD: Iron Sword, Health Potion)...' : 'Add item (e.g. Iron Sword, Health Potion)...'}
-                    value={newItemText}
-                    onChange={e => setNewItemText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddItem(); } }}
-                    disabled={contentItems.length >= 10}
-                    style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.1rem', outline: 'none', fontFamily: 'inherit' }}
-                  />
-                  <span style={{ fontSize: '0.75rem', color: contentItems.length >= 10 ? 'var(--accent-danger)' : 'var(--text-muted)', flexShrink: 0 }}>{contentItems.length}/10</span>
-                </div>
-              </div>
-            )}
-
-            {/* Reference Images inline preview */}
-            {(refRecords.length > 0 || adHocRefs.length > 0) && (
-              <div style={{ display: 'flex', gap: '6px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', overflowX: 'auto' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0, marginRight: '4px' }}>Refs ({totalSelectedRefs}/4)</span>
-                {refRecords.map(r => {
-                  const isSel = selectedRefIds.has(r.id);
-                  return (
-                    <div key={r.id} onClick={() => handleRefToggle(r.id)} style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, cursor: 'pointer', borderRadius: '8px', overflow: 'hidden', border: isSel ? '2px solid var(--accent-primary)' : '2px solid transparent', opacity: isSel ? 1 : 0.35, transition: 'all 0.2s' }}>
-                      <img src={renderObjUrl(r.data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="ref" />
-                    </div>
-                  );
-                })}
-                {adHocRefs.map(r => (
-                  <div key={r.id} style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--accent-warning)' }}>
-                    <img src={r.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="adhoc" />
-                    <button onClick={(e) => { e.stopPropagation(); handeRemoveAdHoc(r.id); }} style={{ position: 'absolute', top: -1, right: -1, background: 'var(--accent-danger)', color: '#fff', fontSize: '10px', width: '16px', height: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>✕</button>
+            {/* ── GENERATION PROGRESS ── */}
+            {genProgress.length > 0 && (
+              <div style={{ padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)' }}>
+                {genProgress.map((step, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0', fontSize: '12px', color: i === genProgress.length - 1 ? 'var(--text-primary)' : 'var(--text-tertiary)', transition: 'color 200ms ease' }}>
+                    <span>{step}</span>
+                    {i === genProgress.length - 1 && generating && (
+                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.2s infinite' }} />
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
-            {/* ── INLINE ADVANCED SETTINGS ── */}
-            {showAdvanced && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)', animation: 'fadeIn 0.3s ease-out' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px' }}>
+            {/* ── THE MAIN GLASS INPUT BOX ── */}
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: '24px',
+                padding: '24px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              {/* Mode Toggle inside input box */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-glass)', padding: '3px', borderRadius: '8px' }}>
+                  <div onClick={() => setContentMode('multi-item')} style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, background: contentMode === 'multi-item' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'multi-item' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}>Multi-Item</div>
+                  <div onClick={() => setContentMode('freeform')} style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, background: contentMode === 'freeform' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'freeform' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}>Free-form</div>
+                </div>
+              </div>
 
-                  {/* Left Column Settings */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Aspect Ratio</label>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {['1:1', '16:9', '9:16', '3:2'].map(ratio => (
-                          <button key={ratio} className="btn btn-sm" style={{ padding: '6px 12px', background: aspectRatio === ratio ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: aspectRatio === ratio ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.8rem' }} onClick={() => setAspectRatio(ratio)}>
-                            {ratio}
-                          </button>
-                        ))}
+              {/* Input Area */}
+              {contentMode === 'freeform' ? (
+                <textarea
+                  placeholder={locale === 'vi' ? 'Mô tả chi tiết ý tưởng của bạn...' : 'Describe your content idea in detail...'}
+                  rows={3}
+                  value={contentIdea}
+                  onChange={(e) => setContentIdea(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.1rem', outline: 'none', resize: 'none', minHeight: '60px', fontFamily: 'inherit', lineHeight: 1.6 }}
+                />
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: contentItems.length > 0 ? '12px' : '0' }}>
+                    {contentItems.map((item, idx) => (
+                      <div key={idx} style={{ background: 'rgba(26,115,232,0.1)', border: '1px solid rgba(26,115,232,0.2)', borderRadius: '999px', padding: '6px 14px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', animation: 'fadeIn 0.2s ease-out' }}>
+                        <span>{item}</span>
+                        <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: 0, cursor: 'pointer', lineHeight: 1, display: 'flex' }} onClick={() => handleRemoveItem(idx)}><X size={14} /></button>
                       </div>
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Images Count</label>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {[1, 2, 4].map(num => (
-                          <button key={num} className="btn btn-sm" style={{ padding: '6px 16px', background: sampleCount === num ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: sampleCount === num ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.8rem' }} onClick={() => setSampleCount(num)}>
-                            {num}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Camera Angle</label>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        {['', 'Isometric', 'Low Angle', 'Eye-Level', 'Top-Down', "Bird's Eye", '3/4 View'].map(angle => (
-                          <button key={angle} className="btn btn-sm" style={{ padding: '6px 12px', background: cameraAngle === angle ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: cameraAngle === angle ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.75rem' }} onClick={() => setCameraAngle(angle)}>
-                            {angle || (locale === 'vi' ? 'Mặc định' : 'Default')}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    ))}
                   </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder={locale === 'vi' ? 'Thêm item (VD: Iron Sword, Health Potion)...' : 'Add item (e.g. Iron Sword, Health Potion)...'}
+                      value={newItemText}
+                      onChange={e => setNewItemText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddItem(); } }}
+                      disabled={contentItems.length >= 10}
+                      style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.1rem', outline: 'none', fontFamily: 'inherit' }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: contentItems.length >= 10 ? 'var(--accent-danger)' : 'var(--text-muted)', flexShrink: 0 }}>{contentItems.length}/10</span>
+                  </div>
+                </div>
+              )}
 
-                  {/* Right Column Settings */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Negative Prompt</label>
-                      <textarea className="form-input" rows={2} placeholder="Things to exclude..." value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', minHeight: '60px' }} />
+              {/* Reference Images inline preview */}
+              {(refRecords.length > 0 || adHocRefs.length > 0) && (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', overflowX: 'auto' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0, marginRight: '4px' }}>Refs ({totalSelectedRefs}/4)</span>
+                  {refRecords.map(r => {
+                    const isSel = selectedRefIds.has(r.id);
+                    return (
+                      <div key={r.id} onClick={() => handleRefToggle(r.id)} style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, cursor: 'pointer', borderRadius: '8px', overflow: 'hidden', border: isSel ? '2px solid var(--accent-primary)' : '2px solid transparent', opacity: isSel ? 1 : 0.35, transition: 'all 0.2s' }}>
+                        <img src={renderObjUrl(r.data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="ref" />
+                      </div>
+                    );
+                  })}
+                  {adHocRefs.map(r => (
+                    <div key={r.id} style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--accent-warning)' }}>
+                      <img src={r.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="adhoc" />
+                      <button onClick={(e) => { e.stopPropagation(); handeRemoveAdHoc(r.id); }} style={{ position: 'absolute', top: -1, right: -1, background: 'var(--accent-danger)', color: '#fff', fontSize: '10px', width: '16px', height: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>✕</button>
                     </div>
-                    <div>
-                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Dominant Color</label>
-                      <input type="text" className="form-input" placeholder="e.g. Neon Pink" value={dominantColor} onChange={(e) => setDominantColor(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none' }} />
+                  ))}
+                </div>
+              )}
+
+              {/* ── INLINE ADVANCED SETTINGS ── */}
+              {showAdvanced && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)', animation: 'fadeIn 0.3s ease-out' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px' }}>
+
+                    {/* Left Column Settings */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Aspect Ratio</label>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {['1:1', '16:9', '9:16', '3:2'].map(ratio => (
+                            <button key={ratio} className="btn btn-sm" style={{ padding: '6px 12px', background: aspectRatio === ratio ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: aspectRatio === ratio ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.8rem' }} onClick={() => setAspectRatio(ratio)}>
+                              {ratio}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Images Count</label>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {[1, 2, 4].map(num => (
+                            <button key={num} className="btn btn-sm" style={{ padding: '6px 16px', background: sampleCount === num ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: sampleCount === num ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.8rem' }} onClick={() => setSampleCount(num)}>
+                              {num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Camera Angle</label>
+                        <select
+                          value={cameraAngle}
+                          onChange={(e) => setCameraAngle(e.target.value)}
+                          style={{ width: '100%', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-primary)', borderRadius: '8px', fontSize: '0.85rem', outline: 'none' }}
+                        >
+                          <option value="" style={{ color: '#000' }}>{locale === 'vi' ? 'Mặc định' : 'Default'}</option>
+                          <option value="Isometric" style={{ color: '#000' }}>Isometric</option>
+                          <option value="Low Angle" style={{ color: '#000' }}>Low Angle</option>
+                          <option value="Eye-Level" style={{ color: '#000' }}>Eye-Level</option>
+                          <option value="Top-Down" style={{ color: '#000' }}>Top-Down</option>
+                          <option value="Bird's Eye" style={{ color: '#000' }}>Bird's Eye</option>
+                          <option value="3/4 View" style={{ color: '#000' }}>3/4 View</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Right Column Settings */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Negative Prompt</label>
+                        <textarea className="form-input" rows={2} placeholder="Things to exclude..." value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', minHeight: '60px' }} />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Dominant Color</label>
+                        <input type="text" className="form-input" placeholder="e.g. Neon Pink" value={dominantColor} onChange={(e) => setDominantColor(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none' }} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Bottom Action Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Bottom Action Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    style={{ borderRadius: '999px', background: showAdvanced ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Settings2 size={15} /> {locale === 'vi' ? 'Cài đặt' : 'Settings'}
+                  </button>
+                  <label
+                    className="btn btn-sm"
+                    style={{ borderRadius: '999px', background: 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Paperclip size={15} /> {locale === 'vi' ? 'Đính kèm' : 'Attach'}
+                    <input type="file" multiple accept="image/*" hidden onChange={handleTempRefUpload} />
+                  </label>
+                </div>
+
                 <button
-                  className="btn btn-sm"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  style={{ borderRadius: '999px', background: showAdvanced ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  className="btn btn-primary"
+                  onClick={handleGenerate}
+                  disabled={generating || !hasContent}
+                  style={{
+                    borderRadius: '999px',
+                    padding: '10px 28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: hasContent ? '#fff' : 'rgba(255,255,255,0.05)',
+                    color: hasContent ? '#000' : 'var(--text-muted)',
+                    fontWeight: 600,
+                    transition: 'all 0.3s ease',
+                    border: 'none',
+                    boxShadow: hasContent ? '0 4px 14px rgba(255,255,255,0.2)' : 'none'
+                  }}
                 >
-                  <Settings2 size={15} /> {locale === 'vi' ? 'Cài đặt' : 'Settings'}
+                  {generating ? <span className="loading-spinner" style={{ width: '16px', height: '16px', borderColor: '#000', borderTopColor: 'transparent' }}></span> : <Rocket size={16} />}
+                  {generating ? (locale === 'vi' ? 'Đang tạo...' : 'Generating...') : (locale === 'vi' ? 'Tạo ảnh' : 'Generate')}
                 </button>
-                <label
-                  className="btn btn-sm"
-                  style={{ borderRadius: '999px', background: 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Paperclip size={15} /> {locale === 'vi' ? 'Đính kèm' : 'Attach'}
-                  <input type="file" multiple accept="image/*" hidden onChange={handleTempRefUpload} />
-                </label>
               </div>
-
-              <button
-                className="btn btn-primary"
-                onClick={handleGenerate}
-                disabled={generating || !hasContent}
-                style={{
-                  borderRadius: '999px',
-                  padding: '10px 28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: hasContent ? '#fff' : 'rgba(255,255,255,0.05)',
-                  color: hasContent ? '#000' : 'var(--text-muted)',
-                  fontWeight: 600,
-                  transition: 'all 0.3s ease',
-                  border: 'none',
-                  boxShadow: hasContent ? '0 4px 14px rgba(255,255,255,0.2)' : 'none'
-                }}
-              >
-                {generating ? <span className="loading-spinner" style={{ width: '16px', height: '16px', borderColor: '#000', borderTopColor: 'transparent' }}></span> : <Rocket size={16} />}
-                {generating ? (locale === 'vi' ? 'Đang tạo...' : 'Generating...') : (locale === 'vi' ? 'Tạo ảnh' : 'Generate')}
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* ── GENERATION PROGRESS ── */}
-        {genProgress.length > 0 && (
-          <div style={{ maxWidth: '800px', width: '100%', margin: '16px auto 0', padding: '16px 20px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)' }}>
-            {genProgress.map((step, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', fontSize: '13px', color: i === genProgress.length - 1 ? 'var(--text-primary)' : 'var(--text-tertiary)', transition: 'color 200ms ease' }}>
-                <span>{step}</span>
-                {i === genProgress.length - 1 && generating && (
-                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', animation: 'pulse 1.2s infinite' }} />
-                )}
-              </div>
-            ))}
+          {/* ── PROMPT REFINE PANEL ── */}
+          <div style={{ width: '100%', marginTop: '8px', paddingBottom: '16px' }}>
+            <PromptRefinePanel
+              style={style}
+              settings={settings}
+              locale={locale}
+              genImages={genImages}
+              refRecords={refRecords}
+              onPromptUpdate={(updates) => onUpdate(style.id, updates)}
+              showToast={showToast}
+            />
           </div>
-        )}
-
-        {/* ── PROMPT REFINE PANEL ── */}
-        <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto' }}>
-          <PromptRefinePanel
-            style={style}
-            settings={settings}
-            locale={locale}
-            genImages={genImages}
-            refRecords={refRecords}
-            onPromptUpdate={(updates) => onUpdate(style.id, updates)}
-            showToast={showToast}
-          />
-        </div>
-
-        {/* ── RESULTS GALLERY ── */}
-        <div style={{ maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '24px 0 48px' }}>
-          {genImages.length > 0 && (
-            <h3 style={{ marginBottom: '16px', fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ImageIcon size={16} /> {locale === 'vi' ? 'Kết quả' : 'Results'} ({genImages.length})
-            </h3>
-          )}
-
-          {genImages.length === 0 && !generating ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              {locale === 'vi' ? 'Chưa có ảnh nào. Nhập ý tưởng và nhấn Tạo ảnh.' : 'No images yet. Enter an idea and hit Generate.'}
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
-              {genImages.map(img => (
-                <div
-                  key={img.id}
-                  onClick={() => setViewerImage(img)}
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 120ms ease', position: 'relative' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)')}
-                >
-                  <img src={renderObjUrl(img.data)} style={{ width: '100%', height: 'auto', display: 'block' }} alt="Gen result" />
-                  <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '6px', display: 'flex', opacity: 0.6 }}>
-                    <Maximize2 size={14} color="#F2F2F0" />
-                  </div>
-                  <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(img.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
+      {/* ── CANVAS AREA (Gallery) ── */}
+      <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', order: 1, background: 'var(--bg-primary)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+
+        <div style={{ flex: 1, maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '32px 24px', paddingBottom: inputLayout === 'bottom' ? '280px' : '64px', display: 'flex', flexDirection: 'column' }}>
+
+          {/* Welcome/Instruction */}
+          {genImages.length === 0 && !generating && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.5s ease-out' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '32px' }}>
+                {locale === 'vi' ? 'Bạn muốn tạo gì hôm nay?' : 'What do you want to create?'}
+              </h2>
+
+              {/* Suggestion Chips */}
+              {!hasContent && (
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {[
+                    locale === 'vi' ? 'Kiếm sắt cổ đại' : 'An ancient iron sword',
+                    locale === 'vi' ? 'Bình thuốc hồi máu' : 'A healing potion bottle',
+                    locale === 'vi' ? 'Tháp canh trung cổ' : 'A medieval watchtower',
+                  ].map((s, i) => (
+                    <button
+                      key={i}
+                      className="btn btn-sm"
+                      style={{ borderRadius: '999px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '8px 16px', transition: 'all 0.2s', cursor: 'pointer' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                      onClick={() => {
+                        if (contentMode === 'multi-item') {
+                          setContentItems([s]);
+                        } else {
+                          setContentIdea(s);
+                        }
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── RESULTS GALLERY ── */}
+          <div style={{ width: '100%', margin: '0 auto', padding: '24px 0 48px' }}>
+            {genImages.length > 0 && (
+              <h3 style={{ marginBottom: '16px', fontSize: '1rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ImageIcon size={16} /> {locale === 'vi' ? 'Kết quả' : 'Results'} ({genImages.length})
+              </h3>
+            )}
+
+            {genImages.length === 0 && !generating ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {locale === 'vi' ? 'Chưa có ảnh nào. Nhập ý tưởng và nhấn Tạo ảnh.' : 'No images yet. Enter an idea and hit Generate.'}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+                {genImages.map(img => (
+                  <div
+                    key={img.id}
+                    onClick={() => setViewerImage(img)}
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 120ms ease', position: 'relative' }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)')}
+                  >
+                    <img src={renderObjUrl(img.data)} style={{ width: '100%', height: 'auto', display: 'block' }} alt="Gen result" />
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '6px', display: 'flex', opacity: 0.6 }}>
+                      <Maximize2 size={14} color="#F2F2F0" />
+                    </div>
+                    <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(img.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       {/* ── IMAGE VIEWER MODAL ── */}
       {viewerImage && (
         <div

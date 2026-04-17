@@ -178,6 +178,12 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
   const aspectHint = aspectRatioToPrompt(aspect_ratio);
   let fullPrompt = `[MANDATORY STYLE INSTRUCTIONS]\n${MANDATORY_STYLE}\n\n[CONTENT IDEA]\n${CONTENT}\n\nGenerate this image with ${aspectHint}.`;
 
+  // Provide stricter camera angle enforcement if specified in CONTENT
+  const cameraAngleMatch = CONTENT.match(/\[CAMERA ANGLE\] (.*)/i);
+  if (cameraAngleMatch && cameraAngleMatch[1]) {
+    fullPrompt += `\n\n[STRICT INSTRUCTION]\nThe user has explicitly requested a specific camera angle/perspective. You MUST strictly generate the image using this perspective: "${cameraAngleMatch[1].trim()}". Ensure the composition deeply reflects this angle.`;
+  }
+
   if (CONTENT.includes('game asset sheet')) {
     fullPrompt += `\n\n[SPATIAL LAYOUT RULES]\n- Arrange all items in a clean grid or evenly spaced layout.\n- Each item must be ISOLATED with clear white/transparent space between them.\n- Do NOT overlap, merge, or blend any items together.\n- Treat each item as an independent sprite that could be individually cropped.\n- Maintain consistent scale across all items.\n- Use a plain or minimal background to maximize asset usability.`;
   }
