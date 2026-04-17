@@ -24,14 +24,14 @@
   --text-muted: #48494A;
   --text-disabled: #48494A;
 
-  /* ── Accent (Mint) ── */
-  --accent: #3DDC97;
-  --accent-hover: #5AE5A8;
-  --accent-muted: #1F3D30;
-  --accent-primary: #3DDC97;
-  --accent-primary-hover: #5AE5A8;
-  --accent-secondary: #5AE5A8;
-  --accent-success: #3DDC97;
+  /* ── Accent (Blue) ── */
+  --accent: #4285F4;
+  --accent-hover: #5A9BFF;
+  --accent-muted: #1A2744;
+  --accent-primary: #4285F4;
+  --accent-primary-hover: #5A9BFF;
+  --accent-secondary: #5A9BFF;
+  --accent-success: #34A853;
   --accent-warning: #FEEFC3;
   --accent-danger: #F28B82;
 

@@ -15,7 +15,7 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
   return (
     <div className="app-sidebar">
       <div className="sidebar-header">
-        <div className="sidebar-logo"><Sparkles size={18} color="#3DDC97" /></div>
+        <div className="sidebar-logo"><Sparkles size={18} color="#4285F4" /></div>
         <div className="sidebar-title">StyleLibrary</div>
       </div>
 
