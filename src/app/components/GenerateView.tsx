@@ -396,20 +396,32 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                         {refRecords.length + adHocRefs.length}
                       </span>
                       {/* Collapsed thumb strip */}
-                      {!refsExpanded && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {[...refRecords.slice(0, 5), ...adHocRefs.slice(0, Math.max(0, 5 - refRecords.length))].map((r, i) => (
-                            <div key={i} style={{ width: '22px', height: '22px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-default)', flexShrink: 0 }}>
-                              <img src={'data' in r ? (r as any).data : renderObjUrl((r as any).data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                            </div>
-                          ))}
-                          {refRecords.length + adHocRefs.length > 5 && (
-                            <div style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
-                              +{refRecords.length + adHocRefs.length - 5}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {!refsExpanded && (() => {
+                        const maxThumbs = 5;
+                        const refSlice = refRecords.slice(0, maxThumbs);
+                        const adhocSlice = adHocRefs.slice(0, Math.max(0, maxThumbs - refSlice.length));
+                        const totalShown = refSlice.length + adhocSlice.length;
+                        const totalAll = refRecords.length + adHocRefs.length;
+                        return (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {refSlice.map((r, i) => (
+                              <div key={`rt-${i}`} style={{ width: '22px', height: '22px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-default)', flexShrink: 0 }}>
+                                <img src={renderObjUrl(r.data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                              </div>
+                            ))}
+                            {adhocSlice.map((r, i) => (
+                              <div key={`at-${i}`} style={{ width: '22px', height: '22px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-default)', flexShrink: 0 }}>
+                                <img src={r.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                              </div>
+                            ))}
+                            {totalAll > totalShown && (
+                              <div style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                                +{totalAll - totalShown}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {refsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
