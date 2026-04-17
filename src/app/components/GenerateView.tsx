@@ -261,27 +261,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   const hasContent = contentMode === 'multi-item' ? contentItems.length > 0 : contentIdea.trim().length > 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg-primary)' }}>
-
-      {/* ── TOP BAR ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', flexShrink: 0, borderBottom: '1px solid var(--border-primary)', zIndex: 10, background: 'var(--surface-1)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button className="btn btn-sm" onClick={onBack} style={{ border: 'none', padding: '6px' }}><ArrowLeft size={18} /></button>
-          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>{style.name}</span>
-        </div>
-
-        {/* Layout toggle */}
-        <div style={{ display: 'flex', background: 'var(--surface-2)', padding: '4px', borderRadius: '8px' }}>
-          <button
-            onClick={() => setInputLayout('sidebar')}
-            style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, border: 'none', borderRadius: '6px', background: inputLayout === 'sidebar' ? 'var(--surface-3)' : 'transparent', color: inputLayout === 'sidebar' ? 'var(--text-primary)' : 'var(--text-tertiary)', cursor: 'pointer', transition: 'all 0.2s' }}
-          >Sidebar</button>
-          <button
-            onClick={() => setInputLayout('bottom')}
-            style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, border: 'none', borderRadius: '6px', background: inputLayout === 'bottom' ? 'var(--surface-3)' : 'transparent', color: inputLayout === 'bottom' ? 'var(--text-primary)' : 'var(--text-tertiary)', cursor: 'pointer', transition: 'all 0.2s' }}
-          >Bottom</button>
-        </div>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#F5F5F5' }}>
 
       {/* ── FLEXIBLE MAIN CONTENT AREA ── */}
       <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
@@ -292,37 +272,39 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           style={
             inputLayout === 'sidebar'
               ? {
-                width: '380px',
+                width: '320px',
                 height: '100%',
-                borderRight: '1px solid var(--border-primary)',
+                borderRight: '1px solid rgba(0,0,0,0.08)',
                 padding: '24px',
                 overflowY: 'auto',
-                background: 'var(--surface-1)',
+                background: '#FFFFFF',
                 display: 'flex',
                 flexDirection: 'column',
                 flexShrink: 0,
                 position: 'relative',
-                zIndex: 10
+                zIndex: 10,
+                color: '#111'
               }
               : {
                 position: 'absolute',
-                bottom: '24px',
+                bottom: '32px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 width: 'calc(100% - 48px)',
-                maxWidth: '800px',
+                maxWidth: '720px',
                 maxHeight: '70vh',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '16px',
                 padding: '20px 24px',
                 overflowY: 'auto',
-                background: 'rgba(20, 20, 22, 0.85)',
+                background: 'rgba(255, 255, 255, 0.95)',
                 backdropFilter: 'blur(24px)',
                 WebkitBackdropFilter: 'blur(24px)',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: 50,
+                color: '#111',
                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
               }
           }
@@ -331,12 +313,12 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
 
             {/* ── GENERATION PROGRESS ── */}
             {genProgress.length > 0 && (
-              <div style={{ padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.02)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '12px' }}>
                 {genProgress.map((step, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0', fontSize: '12px', color: i === genProgress.length - 1 ? 'var(--text-primary)' : 'var(--text-tertiary)', transition: 'color 200ms ease' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0', fontSize: '12px', color: i === genProgress.length - 1 ? '#111' : '#666', transition: 'color 200ms ease' }}>
                     <span>{step}</span>
                     {i === genProgress.length - 1 && generating && (
-                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-primary)', animation: 'pulse 1.2s infinite' }} />
+                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#714DE8', animation: 'pulse 1.2s infinite' }} />
                     )}
                   </div>
                 ))}
@@ -346,8 +328,8 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
             {/* ── THE MAIN GLASS INPUT BOX ── */}
             <div
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border-primary)',
+                background: 'rgba(0,0,0,0.02)',
+                border: '1px solid rgba(0,0,0,0.08)',
                 borderRadius: '24px',
                 padding: '24px',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
@@ -539,7 +521,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       </div>
 
       {/* ── CANVAS AREA (Gallery) ── */}
-      <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', order: 1, background: 'var(--bg-primary)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', order: 1, background: 'transparent', position: 'relative', display: 'flex', flexDirection: 'column' }}>
 
         <div style={{ flex: 1, maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '32px 24px', paddingBottom: inputLayout === 'bottom' ? '280px' : '64px', display: 'flex', flexDirection: 'column' }}>
 
@@ -616,6 +598,18 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           </div>
         </div>
       </div>
+
+      {/* Layout toggle - Floating Bottom Right */}
+      <div style={{ position: 'absolute', bottom: '24px', right: '24px', zIndex: 100, display: 'flex', background: '#FFFFFF', padding: '4px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <button
+          onClick={() => setInputLayout('sidebar')}
+          style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, border: 'none', borderRadius: '6px', background: inputLayout === 'sidebar' ? 'rgba(0,0,0,0.06)' : 'transparent', color: inputLayout === 'sidebar' ? '#111' : '#666', cursor: 'pointer', transition: 'all 0.2s' }}
+        >Sidebar</button>
+        <button
+          onClick={() => setInputLayout('bottom')}
+          style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, border: 'none', borderRadius: '6px', background: inputLayout === 'bottom' ? 'rgba(0,0,0,0.06)' : 'transparent', color: inputLayout === 'bottom' ? '#111' : '#666', cursor: 'pointer', transition: 'all 0.2s' }}
+        >Bottom</button>
+      </div>
       {/* ── IMAGE VIEWER MODAL ── */}
       {viewerImage && (
         <div
@@ -650,6 +644,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
               {/* Download */}
               <button
                 onClick={() => {
+                  if (!viewerImage) return;
                   const a = document.createElement('a');
                   a.href = renderObjUrl(viewerImage.data);
                   a.download = `style-gen-${viewerImage.id}.jpg`;
@@ -665,7 +660,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
               {/* Edit */}
               {onRequestEdit && (
                 <button
-                  onClick={() => { setViewerImage(null); onRequestEdit(viewerImage.id); }}
+                  onClick={() => { if (viewerImage) { setViewerImage(null); onRequestEdit(viewerImage.id); } }}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13px', transition: 'background 120ms ease' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-3)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -676,7 +671,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
 
               {/* Promote to Ref */}
               <button
-                onClick={() => { handlePromote(viewerImage); setViewerImage(null); }}
+                onClick={() => { if (viewerImage) { handlePromote(viewerImage); setViewerImage(null); } }}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent-muted)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--accent)', cursor: 'pointer', fontSize: '13px', fontWeight: 500, transition: 'background 120ms ease' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
                 onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-muted)'; e.currentTarget.style.color = 'var(--accent)'; }}
@@ -686,7 +681,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
 
               {/* Delete */}
               <button
-                onClick={() => handleDeleteGenImage(viewerImage)}
+                onClick={() => { if (viewerImage) handleDeleteGenImage(viewerImage) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--accent-danger)', cursor: 'pointer', fontSize: '13px', transition: 'background 120ms ease' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.15)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
