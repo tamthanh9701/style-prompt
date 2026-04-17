@@ -14,17 +14,8 @@ export function getStyles(): StyleLibrary[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     const styles: StyleLibrary[] = data ? JSON.parse(data) : [];
-    // Migration: add missing fields for old data
-    return styles.map(s => ({
-      ...s,
-      status: s.status || 'active',
-      version: s.version || 1,
-      prompt_instances: s.prompt_instances || [],
-      eval_records: s.eval_records || [],
-      generated_image_ids: s.generated_image_ids || [],
-      generated_images: s.generated_images || [],
-      ref_image_count: s.ref_image_count ?? (s.reference_images?.length || 0),
-    }));
+    // Note: V2 migration happens asynchronously via migrateV1toV2
+    return styles;
   } catch {
     return [];
   }
@@ -32,16 +23,18 @@ export function getStyles(): StyleLibrary[] {
 
 export function saveStyles(styles: StyleLibrary[]): void {
   if (typeof window === 'undefined') return;
-  // Strip large base64 reference_images from localStorage — images live in IndexedDB
-  const stripped = styles.map(s => ({
+  // Always rip out any leftover arrays that could crash localStorage
+  const stripped = styles.map((s) => ({
     ...s,
-    reference_images: [], // Always clear from localStorage after migration
+    reference_images: [],
+    generated_images: [],
+    prompt_history: [],
   }));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
 }
 
 export function getStyleById(id: string): StyleLibrary | undefined {
-  return getStyles().find(s => s.id === id);
+  return getStyles().find((s) => s.id === id);
 }
 
 export function addStyle(style: StyleLibrary): void {
@@ -52,7 +45,7 @@ export function addStyle(style: StyleLibrary): void {
 
 export function updateStyle(id: string, updates: Partial<StyleLibrary>): void {
   const styles = getStyles();
-  const index = styles.findIndex(s => s.id === id);
+  const index = styles.findIndex((s) => s.id === id);
   if (index !== -1) {
     styles[index] = { ...styles[index], ...updates, updated_at: new Date().toISOString() };
     saveStyles(styles);
@@ -60,8 +53,79 @@ export function updateStyle(id: string, updates: Partial<StyleLibrary>): void {
 }
 
 export function deleteStyle(id: string): void {
-  const styles = getStyles().filter(s => s.id !== id);
+  const styles = getStyles().filter((s) => s.id !== id);
   saveStyles(styles);
+}
+
+// ============================================================
+// V1 -> V2 Migration Script
+// ============================================================
+
+export async function migrateV1toV2(): Promise<{ total: number, migrated: number, failed: number }> {
+  if (typeof window === 'undefined') return { total: 0, migrated: 0, failed: 0 };
+
+  const rawData = localStorage.getItem(STORAGE_KEY);
+  if (!rawData) return { total: 0, migrated: 0, failed: 0 };
+
+  const styles: any[] = JSON.parse(rawData);
+  // Check if we need to migrate
+  const needsMigration = styles.some(s => s.reference_images && s.reference_images.length > 0);
+  if (!needsMigration) return { total: 0, migrated: 0, failed: 0 };
+
+  console.log('--- STARTING V1->V2 MIGRATION ---');
+
+  // 1. Create Backup Layer
+  const backupKey = `v1_backup_${Date.now()}`;
+  localStorage.setItem(backupKey, rawData);
+  console.log(`Backup created at: ${backupKey}`);
+
+  const { base64ToBlob, putRefImage } = await import('./db');
+  let migratedCount = 0;
+  let failedCount = 0;
+  let attemptCount = 0;
+
+  // 2. Map loop (chunking per image)
+  for (let i = 0; i < styles.length; i++) {
+    const style = styles[i];
+
+    if (style.reference_images && style.reference_images.length > 0) {
+      for (let j = 0; j < style.reference_images.length; j++) {
+        attemptCount++;
+        const base64Str = style.reference_images[j];
+
+        try {
+          // Pause execution slightly to prevent UI freezing (chunking)
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+          const blob = base64ToBlob(base64Str);
+          await putRefImage({
+            id: `${style.id}_ref_${j}_MIG`,
+            libraryId: style.id,
+            data: blob,
+            mimeType: blob.type,
+            index: j,
+            source: 'original',
+            addedAt: new Date().toISOString()
+          });
+          migratedCount++;
+        } catch (err) {
+          failedCount++;
+          console.error(`Migration Failed for Style ${style.id} Image ${j}: `, err);
+          // Partial Migration Rule: Log it, but let the loop continue safely
+        }
+      }
+
+      // Update metadata fields to v2
+      style.ref_image_count = style.reference_images.length;
+      style.reference_images = []; // Strip
+    }
+  }
+
+  // 3. Save purely migrated metadata
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(styles));
+
+  console.log(`Migration Complete: ${migratedCount} Migrated, ${failedCount} Failed.`);
+  return { total: attemptCount, migrated: migratedCount, failed: failedCount };
 }
 
 // ============================================================
@@ -224,7 +288,7 @@ export function generateId(): string {
 
 export async function callAI(
   settings: AppSettings,
-  action: 'analyzeStyle' | 'compareImages' | 'suggestImprovements' | 'generateVariant' | 'variantFromImage' | 'analyzeForEdit' | 'generateEditPrompt',
+  action: 'analyzeStyle',
   images: string[],
   options?: { prompt_context?: string; reference_images?: string[] }
 ) {
@@ -333,7 +397,10 @@ export async function callAI(
 
 export async function callImageGen(
   settings: AppSettings,
-  prompt: string,
+  payload: {
+    MANDATORY_STYLE: string;
+    CONTENT: string;
+  },
   options?: {
     negative_prompt?: string;
     aspect_ratio?: string;
@@ -354,16 +421,19 @@ export async function callImageGen(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      prompt,
-      negative_prompt: options?.negative_prompt,
-      aspect_ratio: options?.aspect_ratio || cfg.default_aspect_ratio,
-      reference_images: options?.reference_images,
-      sample_count: options?.sample_count || cfg.default_sample_count,
-      seed: options?.seed,
-      model: cfg.model,
-      vertex_project: cfg.vertex_project,
-      vertex_location: cfg.vertex_location || 'global',
-      vertex_credentials: cfg.vertex_credentials,
+      MANDATORY_STYLE: payload.MANDATORY_STYLE,
+      CONTENT: payload.CONTENT,
+      references: options?.reference_images,
+      settings: {
+        negative_prompt: options?.negative_prompt,
+        aspect_ratio: options?.aspect_ratio || cfg.default_aspect_ratio,
+        sample_count: options?.sample_count || cfg.default_sample_count,
+        seed: options?.seed,
+        model: cfg.model,
+        vertex_project: cfg.vertex_project,
+        vertex_location: cfg.vertex_location || 'global',
+        vertex_credentials: cfg.vertex_credentials,
+      }
     }),
   });
 
@@ -381,4 +451,16 @@ export async function callImageGen(
   }
 
   return data.images || [];
+}
+
+export async function callRefinePrompt(
+  settings: AppSettings,
+  generatedImages: string[],
+  referenceImages: string[],
+  currentPrompt: import('@/types').PromptSchema
+): Promise<import('@/types').RefineSuggestion> {
+  return callAI(settings, 'refinePrompt' as any, generatedImages, {
+    reference_images: referenceImages,
+    prompt_context: JSON.stringify(currentPrompt)
+  }) as Promise<import('@/types').RefineSuggestion>;
 }

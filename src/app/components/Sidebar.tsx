@@ -33,13 +33,7 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
           <span className="nav-icon">➕</span>
           {L('nav_new_style')}
         </button>
-        <button 
-          className={`nav-item ${currentView === 'studio' ? 'active' : ''}`}
-          onClick={() => setView('studio')}
-        >
-          <span className="nav-icon">🎨</span>
-          Image Studio
-        </button>
+
         <button 
           className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
           onClick={() => setView('settings')}

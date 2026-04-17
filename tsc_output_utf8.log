@@ -1,0 +1,18 @@
+﻿src/app/components/CreateStyleView.tsx(97,56): error TS2345: Argument of type 'string[]' is not assignable to parameter of type 'RefImageRecord[]'.
+  Type 'string' is not assignable to type 'RefImageRecord'.
+src/app/components/EditStyleView.tsx(5,58): error TS2459: Module '"@/lib/db"' declares 'RefImageRecord' locally, but it is not exported.
+src/app/components/EditStyleView.tsx(193,96): error TS2345: Argument of type '"action_save"' is not assignable to parameter of type 'keyof TranslationKeys'.
+src/app/components/EditStyleView.tsx(194,112): error TS2345: Argument of type '"action_generate"' is not assignable to parameter of type 'keyof TranslationKeys'.
+src/app/components/EditStyleView.tsx(220,20): error TS2322: Type '{ positive: string; negative: string; }' is not assignable to type 'ReactNode'.
+src/app/components/EditStyleView.tsx(252,32): error TS2322: Type 'unknown' is not assignable to type 'string | number | string[] | null'.
+src/app/components/GenerateView.tsx(5,70): error TS2459: Module '"@/lib/db"' declares 'GenImageRecord' locally, but it is not exported.
+src/app/components/GenerateView.tsx(62,54): error TS2345: Argument of type '{ MANDATORY_STYLE: { positive: string; negative: string; }; CONTENT: string; }' is not assignable to parameter of type '{ MANDATORY_STYLE: string; CONTENT: string; }'.
+  Types of property 'MANDATORY_STYLE' are incompatible.
+    Type '{ positive: string; negative: string; }' is not assignable to type 'string'.
+src/app/components/GenerateView.tsx(141,16): error TS2322: Type '{ positive: string; negative: string; }' is not assignable to type 'ReactNode'.
+src/app/components/ImageEditView.tsx(4,10): error TS2724: '"@/lib/storage"' has no exported member named 'callImageEdit'. Did you mean 'callImageGen'?
+src/app/components/ImageEditView.tsx(5,43): error TS2459: Module '"@/lib/db"' declares 'GenImageRecord' locally, but it is not exported.
+src/app/components/ImageEditView.tsx(38,43): error TS2339: Property 'generationSource' does not exist on type 'GenImageRecord'.
+src/app/components/ImageEditView.tsx(60,58): error TS7006: Parameter 'b64' implicitly has an 'any' type.
+src/app/components/SettingsView.tsx(320,133): error TS2345: Argument of type 'string' is not assignable to parameter of type '{ MANDATORY_STYLE: string; CONTENT: string; }'.
+

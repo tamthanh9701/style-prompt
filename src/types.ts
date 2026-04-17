@@ -163,6 +163,7 @@ export interface GenerationParamsGroup {
 // ============================================================
 
 export interface PromptSchema {
+  schema_version?: number; // v2
   style_name: string;
   version: string;
   subject_type: SubjectType;
@@ -187,34 +188,85 @@ export interface PromptSchema {
 // ============================================================
 // Style Library
 // ============================================================
+export type StyleType = 'photo' | 'illustration' | 'cinematic' | 'anime' | 'product' | 'mixed';
+
 // Status lifecycle: draft → active → deprecated
 export type StyleStatus = 'draft' | 'active' | 'deprecated';
 
 // Maximum number of reference images per style
-export const MAX_REFERENCE_IMAGES = 30;
+export const MAX_REFERENCE_IMAGES = 10;
+
+export interface RefImageRecord {
+  id: string;
+  libraryId: string;
+  data: Blob;
+  mimeType: string;
+  index: number;
+  source: 'original' | 'generated'; // MỤC ĐÍCH: Tracking phạt trọng số chống Drift
+  sourceJobId?: string; // DEBUG/RESTORE: Nhớ ID của Lần Gen đã đẻ ra Ref này
+  addedAt: string;
+}
+
+export interface GenImageRecord {
+  id: string;
+  libraryId: string;
+  jobId?: string;
+  data: Blob | string;
+  mimeType?: string;
+  createdAt: string;
+  generationSource?: string;
+  aspectRatio?: string;
+  promptText?: string;
+  promptJson?: string;
+}
+
+export interface GenerationJob {
+  id: string;
+  libraryId: string;
+  versionId: string;       // RESTORE: Khóa Version dùng lúc Gen
+  userPrompt: string;
+  mergedPrompt: string;    // DEBUG: Payload Text gửi đi thực tế
+  modelConfig: { model: string; aspectRatio: string; outputCount: number; seed?: number };
+  outputImageIds: string[];
+  status: 'queued' | 'running' | 'done' | 'error';
+  durationMs: number;      // KPI API Health
+  errorDetail?: string;    // DEBUG Lỗi
+  userRating?: number;
+  createdAt: string;
+}
+
+export interface LibraryVersion {
+  id: string; libraryId: string; versionNumber: number; versionName: string;
+  parentVersionId?: string;// RESTORE LOGIC.
+  prompt: PromptSchema;    // CẤU TRÚC 15 NHÓM V1 (Schema_version: 2).
+  referenceImageIds: string[];
+  createdAt: string;
+}
 
 export interface StyleLibrary {
   id: string;
   name: string;
   description: string;
+  styleType: StyleType;
+  tags: string[];
+  coverImageId: string | null;
   created_at: string;
   updated_at: string;
   // Lifecycle & versioning
   status: StyleStatus;
   version: number; // auto-increment: 1, 2, 3...
-  parent_version_id?: string; // links to previous version for version chain
-  // Content
-  // NOTE: actual image data is stored in IndexedDB via lib/db.ts
-  // reference_images kept for backward compat during migration (removed after migration)
-  reference_images: string[]; // DEPRECATED: use getRefImageData(style.id) from lib/db.ts
-  ref_image_count: number;    // count of reference images (source of truth)
-  prompt: PromptSchema;
-  prompt_history: PromptSchema[]; // version history
-  generated_image_ids: string[];  // IDs of GenImageRecord in IndexedDB
-  generated_images: GeneratedImage[]; // DEPRECATED: kept for backward compat
-  // Cached variant detection results (persisted so AI only detects once)
+  activeVersionId: string;
+
+  // -- CÁC TRƯỜNG GIỮ TỪ V1 (Vì PromptSchema vẫn là Core) --
+  ref_image_count: number;
+  prompt: PromptSchema;         // Schema hiện tại đang edit
+
+  // DEPRECATED (Will be removed after migration):
+  reference_images: string[];
+  prompt_history: PromptSchema[];
+  generated_image_ids: string[];
+  generated_images: GeneratedImage[];
   cached_variant_fields?: VariantFieldCache;
-  // Tracking
   prompt_instances: PromptInstance[];
   eval_records: EvalRecord[];
 }
@@ -950,3 +1002,15 @@ export const PROMPT_GROUPS: GroupMeta[] = [
     ],
   },
 ];
+
+export interface RefineSuggestion {
+  drift_summary: string;
+  confidence: 'high' | 'medium' | 'low';
+  suggested_changes: Array<{
+    group: string;
+    field: string;
+    current_value: string | null;
+    suggested_value: string;
+    reason: string;
+  }>;
+}

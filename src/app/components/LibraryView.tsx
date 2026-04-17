@@ -1,6 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { StyleLibrary, StyleStatus } from '@/types';
 import { type Locale, t } from '@/lib/i18n';
+import { getRefImages, getRefImageById } from '@/lib/db';
+
+function LibraryCoverImage({ libraryId, coverImageId }: { libraryId: string, coverImageId: string | null | undefined }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let isMounted = true;
+
+    async function loadCover() {
+      try {
+        let record = coverImageId ? await getRefImageById(coverImageId) : undefined;
+        if (!record) {
+          const refs = await getRefImages(libraryId);
+          if (refs.length > 0) record = refs[0];
+        }
+        if (record && isMounted) {
+          objectUrl = URL.createObjectURL(record.data);
+          setUrl(objectUrl);
+        }
+      } catch (err) {
+        console.error("Failed to load cover image", err);
+      }
+    }
+
+    loadCover();
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [libraryId, coverImageId]);
+
+  if (!url) {
+    return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '2rem' }}>🖼️</div>;
+  }
+
+  return <img src={url} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+}
 
 export default function LibraryView({ styles, locale, onSelect, onCreate, onDelete }: {
   styles: StyleLibrary[];
@@ -50,8 +89,7 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
             <div key={style.id} className="style-card" onClick={() => onSelect(style.id)}
               style={(style.status || 'active') === 'deprecated' ? { opacity: 0.6 } : undefined}>
               <div className="style-card-images">
-                {/* Thumbnail placeholder — images in IndexedDB, load on demand */}
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '2rem' }}>🖼️</div>
+                <LibraryCoverImage libraryId={style.id} coverImageId={style.coverImageId} />
                 {(style.ref_image_count || 0) > 0 && (
                   <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '0.65rem', padding: '2px 5px', borderRadius: '3px', fontWeight: 600 }}>
                     {style.ref_image_count}

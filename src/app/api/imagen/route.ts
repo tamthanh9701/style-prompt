@@ -9,17 +9,19 @@ import { NextRequest, NextResponse } from 'next/server';
 export const maxDuration = 180; // seconds — image gen can take longer
 
 interface ImagenRequestBody {
-  prompt: string;
-  negative_prompt?: string;
-  aspect_ratio?: string;
-  reference_images?: string[];  // base64 data URLs for style reference
-  sample_count?: number;
-  seed?: number;
-  // Vertex AI config
-  model: string;
-  vertex_project: string;
-  vertex_location?: string;
-  vertex_credentials: string;   // Service account JSON string
+  MANDATORY_STYLE: string;
+  CONTENT: string;
+  references?: string[];
+  settings: {
+    negative_prompt?: string;
+    aspect_ratio?: string;
+    sample_count?: number;
+    seed?: number;
+    model: string;
+    vertex_project: string;
+    vertex_location?: string;
+    vertex_credentials: string;
+  };
 }
 
 // ============================================================
@@ -151,16 +153,21 @@ function aspectRatioToPrompt(ratio: string): string {
 
 async function generateImages(body: ImagenRequestBody): Promise<string[]> {
   const {
-    prompt,
-    negative_prompt,
-    aspect_ratio = '1:1',
-    reference_images = [],
-    sample_count = 1,
+    MANDATORY_STYLE,
+    CONTENT,
+    references = [],
+    settings,
+  } = body;
+  
+  const {
     model,
     vertex_project,
     vertex_location = 'global',
     vertex_credentials,
-  } = body;
+    aspect_ratio = '1:1',
+    negative_prompt,
+    sample_count = 1,
+  } = settings;
 
   // Get OAuth2 token from service account credentials
   const accessToken = await getAccessTokenFromCredentials(vertex_credentials);
@@ -168,9 +175,8 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
   const url = buildImageGenUrl(vertex_project, vertex_location, model);
   console.log(`[IMAGEN] URL: ${url}`);
 
-  // Build full prompt with aspect ratio hint
   const aspectHint = aspectRatioToPrompt(aspect_ratio);
-  let fullPrompt = `${prompt}\n\nGenerate this image with ${aspectHint}.`;
+  let fullPrompt = `[MANDATORY STYLE INSTRUCTIONS]\n${MANDATORY_STYLE}\n\n[CONTENT IDEA]\n${CONTENT}\n\nGenerate this image with ${aspectHint}.`;
   if (negative_prompt) {
     fullPrompt += `\n\nAvoid: ${negative_prompt}`;
   }
@@ -189,7 +195,8 @@ async function generateImages(body: ImagenRequestBody): Promise<string[]> {
     ];
 
     // Add reference style images
-    for (const refImg of reference_images.slice(0, 3)) { // Max 3 ref images
+    // Sort original refs before generated refs (if they were tagged, UI handles it, here we just take the array)
+    for (const refImg of references.slice(0, 4)) { // Max 4 ref images total
       const { base64, mediaType } = extractBase64(refImg);
       parts.push({
         inlineData: { mimeType: mediaType, data: base64 },
@@ -258,20 +265,22 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: ImagenRequestBody = await request.json();
-    const { prompt, model, vertex_project, vertex_credentials, sample_count, aspect_ratio } = body;
+    const { MANDATORY_STYLE, CONTENT, settings, references } = body;
+    const { model, vertex_project, vertex_credentials, sample_count, aspect_ratio } = settings || {};
 
     console.log(`\n🖼️ [IMAGEN:${reqId}] REQUEST`, {
       model,
       project: vertex_project,
       sampleCount: sample_count,
       aspectRatio: aspect_ratio,
-      promptLength: prompt?.length || 0,
-      referenceImages: body.reference_images?.length || 0,
+      styleLength: MANDATORY_STYLE?.length || 0,
+      contentLength: CONTENT?.length || 0,
+      referenceImages: references?.length || 0,
     });
 
     // Validate required fields
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    if (!MANDATORY_STYLE || !CONTENT) {
+      return NextResponse.json({ error: 'MANDATORY_STYLE and CONTENT are required' }, { status: 400 });
     }
     if (!model) {
       return NextResponse.json({ error: 'Model is required' }, { status: 400 });
