@@ -125,10 +125,29 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       setGenProgress(p => [...p, locale === 'vi' ? '✨ Đang chuẩn bị prompt...' : '✨ Preparing prompt...']);
       const flatStyle = flattenPrompt(style.prompt as PromptSchema);
       const selectedLibRefs = refRecords.filter(r => selectedRefIds.has(r.id));
+      const totalRefs = selectedLibRefs.length + adHocRefs.length;
 
-      setGenProgress(p => [...p, locale === 'vi' ? `🖼️ Đang phân tích ${selectedLibRefs.length + adHocRefs.length} ảnh tham chiếu...` : `🖼️ Analyzing ${selectedLibRefs.length + adHocRefs.length} reference images...`]);
+      if (totalRefs > 0) {
+        setGenProgress(p => [...p, locale === 'vi'
+          ? `🖼️ Đang chuẩn bị ${totalRefs} ảnh tham chiếu (${selectedLibRefs.length} từ thư viện, ${adHocRefs.length} đính kèm)...`
+          : `🖼️ Preparing ${totalRefs} reference images (${selectedLibRefs.length} from library, ${adHocRefs.length} attached)...`
+        ]);
+      } else {
+        setGenProgress(p => [...p, locale === 'vi' ? '🖼️ Không có ảnh tham chiếu — AI sẽ tự tạo theo style prompt' : '🖼️ No reference images — AI will generate from style prompt only']);
+      }
       const b64SelectedLibRefs = await Promise.all(selectedLibRefs.map(r => blobToBase64(r.data)));
       const b64Refs = [...b64SelectedLibRefs, ...adHocRefs.map(r => r.data)].slice(0, 4);
+
+      if (b64Refs.length > 0) {
+        const sizes = b64Refs.map((b, i) => {
+          const sizeKB = Math.round(b.length * 0.75 / 1024);
+          return `Ref ${i + 1}: ~${sizeKB}KB`;
+        });
+        setGenProgress(p => [...p, locale === 'vi'
+          ? `📎 Đã encode ${b64Refs.length} ảnh ref (${sizes.join(', ')}) — đính kèm vào request`
+          : `📎 Encoded ${b64Refs.length} ref images (${sizes.join(', ')}) — attaching to request`
+        ]);
+      }
 
       let promptIdea = '';
       if (contentMode === 'multi-item') {
@@ -385,7 +404,13 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                     </div>
                     <div>
                       <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Camera Angle</label>
-                      <input type="text" className="form-input" placeholder="e.g. Low angle, zoomed" value={cameraAngle} onChange={(e) => setCameraAngle(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none' }} />
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {['', 'Isometric', 'Low Angle', 'Eye-Level', 'Top-Down', "Bird's Eye", '3/4 View'].map(angle => (
+                          <button key={angle} className="btn btn-sm" style={{ padding: '6px 12px', background: cameraAngle === angle ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: cameraAngle === angle ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.75rem' }} onClick={() => setCameraAngle(angle)}>
+                            {angle || (locale === 'vi' ? 'Mặc định' : 'Default')}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
