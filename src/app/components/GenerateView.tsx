@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { StyleLibrary, AppSettings, PromptSchema } from '@/types';
 import { type Locale, t } from '@/lib/i18n';
 import { callImageGen, generateId, fileToBase64 } from '@/lib/storage';
-import { saveGenImage, getGenImages, getRefImages, putRefImage, type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
+import { saveGenImage, getGenImages, getRefImages, putRefImage, deleteGenImage, type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
 import { flattenPrompt } from '@/types';
 import PromptRefinePanel from '@/app/components/PromptRefinePanel';
-import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud, Settings2, ChevronDown, ChevronUp, ImageIcon, X, ArrowLeft, ZoomIn, Maximize2 } from 'lucide-react';
+import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud, Settings2, ChevronDown, ChevronUp, ImageIcon, X, ArrowLeft, ZoomIn, Maximize2, Trash2 } from 'lucide-react';
 
 export default function GenerateView({ style, settings, locale, onBack, onUpdate, showToast, onRequestEdit }: {
   style: StyleLibrary;
@@ -237,6 +237,15 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       });
       onUpdate(style.id, { ref_image_count: currentRefs.length + 1 });
       showToast(locale === 'vi' ? 'Đã thêm vào thư viện Style' : 'Promoted to Style Library!', 'success');
+    }
+  };
+
+  const handleDeleteGenImage = async (record: GenImageRecord) => {
+    if (confirm(locale === 'vi' ? 'Xóa ảnh này?' : 'Delete this image?')) {
+      await deleteGenImage(record.id);
+      await reloadImages();
+      setViewerImage(null);
+      showToast(locale === 'vi' ? 'Đã xóa ảnh' : 'Image deleted', 'success');
     }
   };
 
@@ -602,6 +611,16 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                 onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-muted)'; e.currentTarget.style.color = 'var(--accent)'; }}
               >
                 <Star size={15} /> {locale === 'vi' ? 'Dùng làm Ref' : 'Use as Ref'}
+              </button>
+
+              {/* Delete */}
+              <button
+                onClick={() => handleDeleteGenImage(viewerImage)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 16px', color: 'var(--accent-danger)', cursor: 'pointer', fontSize: '13px', transition: 'background 120ms ease' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.15)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <Trash2 size={15} /> {locale === 'vi' ? 'Xóa' : 'Delete'}
               </button>
             </div>
           </div>

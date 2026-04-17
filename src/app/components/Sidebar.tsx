@@ -27,13 +27,7 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
           <span className="nav-icon"><LibraryBig size={18} /></span>
           {L('lib_title')}
         </button>
-        <button
-          className={`nav-item ${currentView === 'create' ? 'active' : ''}`}
-          onClick={() => setView('create')}
-        >
-          <span className="nav-icon"><PlusCircle size={18} /></span>
-          {L('nav_new_style')}
-        </button>
+
 
         <button
           className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
