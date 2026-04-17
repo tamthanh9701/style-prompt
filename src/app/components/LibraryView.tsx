@@ -81,7 +81,7 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
         </span>
       </div>
       {filteredStyles.length === 0 && styles.length === 0 ? (
-        <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)' }}>
+        <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
           <div className="empty-state-icon" style={{ opacity: 0.5, marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><ImageIcon size={48} strokeWidth={1} color="var(--accent-primary)" /></div>
           <h2 className="empty-state-title">{L('lib_empty_title')}</h2>
           <p className="empty-state-desc">{L('lib_empty_desc')}</p>

@@ -1,48 +1,60 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-  /* Colors - UI UX Pro Max Master Style */
-  --bg-primary: #FAF5FF;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F7F3FD;
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #F8FAFC;
-  --bg-glass: rgba(255, 255, 255, 0.6);
-  --bg-glass-hover: rgba(255, 255, 255, 0.9);
+  /* Tonal Surfaces - Digital Curator Style */
+  --bg-primary: #111111;
+  /* surface */
+  --bg-secondary: #1C1C1C;
+  /* surface-container-low */
+  --bg-tertiary: #2A2A2A;
+  /* surface-container-lowest */
+  --bg-card: #2A2A2A;
+  --bg-card-hover: #333333;
+  --bg-glass: rgba(42, 42, 42, 0.8);
+  --bg-glass-hover: rgba(42, 42, 42, 0.9);
 
-  --border-primary: #EFE7FC;
-  --border-hover: #D8B4FE;
-  --border-active: #7C3AED;
+  /* Ghost Borders */
+  --border-primary: rgba(227, 227, 227, 0.15);
+  --border-hover: rgba(227, 227, 227, 0.3);
+  --border-active: #1A73E8;
 
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-tertiary: #64748B;
-  --text-muted: #94A3B8;
+  /* Typography / Text Colors */
+  --text-primary: #E3E3E3;
+  /* on-surface */
+  --text-secondary: #A0A0A0;
+  /* on-surface-variant */
+  --text-tertiary: #737373;
+  --text-muted: #565656;
 
-  /* Accent #EC4899 mapped to primary gradient / action */
-  --accent-primary: #7C3AED;
-  --accent-primary-hover: #6D28D9;
-  --accent-secondary: #6366F1;
-  --accent-success: #10B981;
-  --accent-warning: #F59E0B;
-  --accent-danger: #DC2626;
+  /* Accent & Gradients */
+  --accent-primary: #1A73E8;
+  --accent-primary-hover: #1557AF;
+  --accent-secondary: #8AB4F8;
+  --accent-success: #81C995;
+  --accent-warning: #FEEFC3;
+  --accent-danger: #F28B82;
 
-  --gradient-primary: linear-gradient(135deg, #EC4899 0%, #D946EF 100%);
-  --gradient-secondary: linear-gradient(135deg, #7C3AED 0%, #6366F1 100%);
-  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 1) 0%, rgba(248, 250, 252, 1) 100%);
+  --gradient-primary: linear-gradient(135deg, #1A73E8 0%, #1557AF 100%);
+  --gradient-secondary: linear-gradient(135deg, #8AB4F8 0%, #1A73E8 100%);
+  --gradient-card: none;
+  /* No gradients for cards, use surfaces */
   --gradient-glow: none;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
-  --shadow-glow: 0 8px 16px rgba(236, 72, 153, 0.2);
+  /* Ambient Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 8px 16px rgba(26, 115, 232, 0.2);
 
+  /* Refined Geometry */
   --radius-sm: 4px;
   --radius-md: 8px;
+  /* Standard moderate curve */
   --radius-lg: 12px;
   --radius-xl: 16px;
 
+  /* Motion */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -62,12 +74,24 @@ html {
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.display-font,
+.title-font {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: -0.02em;
 }
 
 body::before {
@@ -89,13 +113,11 @@ body::before {
 .app-sidebar {
   width: 260px;
   background: var(--bg-card);
-  border-right: 1px solid var(--border-primary);
+  border-right: none;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   z-index: 10;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .sidebar-header {
@@ -103,7 +125,8 @@ body::before {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid var(--border-primary);
+  /* Ghost border mapped via background or margin, actually let's use margin in No-line rule */
+  margin-bottom: 8px;
 }
 
 .sidebar-logo {
@@ -180,7 +203,7 @@ body::before {
 
 .sidebar-footer {
   padding: 16px;
-  border-top: 1px solid var(--border-primary);
+  /* NO LINE RULE: border-top removed */
 }
 
 .app-main {
@@ -214,8 +237,10 @@ body::before {
   gap: 8px;
   padding: 10px 20px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-primary);
-  background: var(--bg-glass);
+  /* Moderate curve */
+  border: 1px solid transparent;
+  /* Ghost border structure */
+  background: transparent;
   color: var(--text-primary);
   font-family: inherit;
   font-size: 0.875rem;
@@ -239,13 +264,32 @@ body::before {
 .btn-primary {
   background: var(--gradient-primary);
   border-color: transparent;
-  color: white;
+  color: #fff;
+  /* Always white on primary actions */
   font-weight: 600;
+  /* Tonal rule: Add shadow for CTA to provide depth */
+  box-shadow: var(--shadow-glow);
 }
 
 .btn-primary:hover {
   opacity: 0.9;
-  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  color: var(--accent-primary);
+  border: 1px solid var(--border-primary);
+  /* Ghost borders */
+  background: transparent;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-glass);
+  border-color: var(--border-hover);
 }
 
 .btn-danger {
@@ -295,7 +339,9 @@ body::before {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
+  /* Use ghost border by ensuring --border-primary is 0.15 */
+  border-radius: var(--radius-md);
+  /* No more pill curves */
   padding: 24px;
   transition: all var(--transition-base);
 }

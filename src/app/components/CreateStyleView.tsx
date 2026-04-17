@@ -16,6 +16,7 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
   const [images, setImages] = useState<string[]>([]);
   const [styleName, setStyleName] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{ style: StyleLibrary; fieldCount: number; refImages: string[], meta?: any } | null>(null);
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
@@ -123,19 +124,27 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
 
   const handleAcceptResult = async () => {
     if (analysisResult) {
-      if (analysisResult.refImages && analysisResult.refImages.length > 0) {
-        const records: RefImageRecord[] = analysisResult.refImages.map((b64, index) => ({
-          id: `${analysisResult.style.id}_ref_init_${index}`,
-          libraryId: analysisResult.style.id,
-          data: base64ToBlob(b64),
-          mimeType: b64.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg',
-          index,
-          source: 'original',
-          addedAt: new Date().toISOString()
-        }));
-        await idbSetRefImages(analysisResult.style.id, records);
+      setSaving(true);
+      try {
+        if (analysisResult.refImages && analysisResult.refImages.length > 0) {
+          const records: RefImageRecord[] = analysisResult.refImages.map((b64, index) => ({
+            id: `${analysisResult.style.id}_ref_init_${index}`,
+            libraryId: analysisResult.style.id,
+            data: base64ToBlob(b64),
+            mimeType: b64.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg',
+            index,
+            source: 'original',
+            addedAt: new Date().toISOString()
+          }));
+          await idbSetRefImages(analysisResult.style.id, records);
+        }
+        onCreate(analysisResult.style);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Error saving style', 'error');
+        console.error(err);
+      } finally {
+        setSaving(false);
       }
-      onCreate(analysisResult.style);
     }
   };
 
@@ -243,8 +252,8 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
                 })}
               </div>
 
-              <button className="btn btn-primary btn-lg" onClick={handleAcceptResult} style={{ width: '100%' }}>
-                {L('analysis_view_edit')}
+              <button className="btn btn-primary btn-lg" onClick={handleAcceptResult} disabled={saving} style={{ width: '100%' }}>
+                {saving ? 'Saving...' : L('analysis_view_edit')}
               </button>
             </div>
           </div>
