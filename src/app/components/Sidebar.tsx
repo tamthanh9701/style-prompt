@@ -1,6 +1,6 @@
 import React from 'react';
 import { Locale, t } from '@/lib/i18n';
-import { Layers, LibraryBig, Settings, ClipboardList, PenTool } from 'lucide-react';
+import { Layers, LibraryBig, ClipboardList, Settings } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -13,14 +13,27 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
   return (
-    <div className="app-topbar" style={{ display: 'flex', alignItems: 'center', height: '48px', padding: '0 16px', background: '#FFFFFF', borderBottom: '1px solid rgba(0,0,0,0.06)', zIndex: 100 }}>
+    <div
+      className="app-topbar"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        height: '48px',
+        padding: '0 16px',
+        background: 'rgba(15, 15, 16, 0.75)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid var(--border-subtle)',
+        zIndex: 100,
+      }}
+    >
       {/* ── Left Side (Logo & Nav) ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={() => setView('library')}>
-          <div style={{ background: '#000', borderRadius: '6px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--accent)', borderRadius: '6px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Layers size={14} color="#FFF" />
           </div>
-          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111' }}>StyleLibrary</span>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>StyleLibrary</span>
         </div>
 
         <nav style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -30,14 +43,6 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
           >
             <LibraryBig size={14} />
             {L('lib_title')}
-          </button>
-          <button
-            className={`top-nav-item ${currentView === 'generate' ? 'active' : ''}`}
-            // If they are not in a style, clicking work/studio goes back to library
-            onClick={() => setView('library')}
-          >
-            <PenTool size={14} />
-            Workflows
           </button>
 
           <button
@@ -58,39 +63,21 @@ export default function Sidebar({ currentView, setView, locale, setLocale }: Sid
         </nav>
       </div>
 
-      {/* ── Center Area (File Name context, optional) ── */}
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-        {/* Placeholder for project name or currently editing style name */}
-        <div style={{ padding: '4px 12px', background: 'rgba(0,0,0,0.04)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, color: '#333' }}>
-          Untitled v
-        </div>
-      </div>
-
-      {/* ── Right Side (User & Locale) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.04)', padding: '2px', borderRadius: '6px' }}>
+      {/* ── Right Side (Locale toggle only) ── */}
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <div style={{ display: 'flex', background: 'var(--surface-3)', padding: '2px', borderRadius: '6px' }}>
           <button
-            style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, background: locale === 'en' ? '#FFF' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'en' ? '#111' : '#666', cursor: 'pointer', boxShadow: locale === 'en' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
+            style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, background: locale === 'en' ? 'var(--surface-1)' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'en' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}
             onClick={() => setLocale('en')}
           >
             EN
           </button>
           <button
-            style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, background: locale === 'vi' ? '#FFF' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'vi' ? '#111' : '#666', cursor: 'pointer', boxShadow: locale === 'vi' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}
+            style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600, background: locale === 'vi' ? 'var(--surface-1)' : 'transparent', border: 'none', borderRadius: '4px', color: locale === 'vi' ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}
             onClick={() => setLocale('vi')}
           >
             VI
           </button>
-        </div>
-
-        <button style={{ background: 'transparent', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '6px', padding: '4px 12px', fontSize: '0.8rem', fontWeight: 600, color: '#111', cursor: 'pointer' }}>
-          Share
-        </button>
-        <div style={{ background: '#714DE8', color: '#FFF', borderRadius: '6px', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-          <span>Upgrade</span>
-        </div>
-        <div style={{ width: '28px', height: '28px', background: '#DDD', borderRadius: '50%', border: '1px solid rgba(0,0,0,0.1)', flexShrink: 0, cursor: 'pointer' }}>
-          {/* Avatar placeholder */}
         </div>
       </div>
     </div>

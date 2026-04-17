@@ -200,7 +200,7 @@ type TranslationKeys = {
 const translations: Record<Locale, TranslationKeys> = {
   vi: {
     nav_title: 'Thư Viện Prompt',
-    nav_settings: '⚙️ Cài đặt',
+    nav_settings: 'Cài đặt',
     nav_new_style: '+ Tạo mới',
 
     lib_title: 'Thư Viện Style',
@@ -216,7 +216,7 @@ const translations: Record<Locale, TranslationKeys> = {
     create_style_name_placeholder: 'VD: Cyberpunk Noir, Giấc Mơ Màu Nước...',
     create_drop_title: 'Kéo thả ảnh vào đây hoặc nhấn để chọn',
     create_drop_desc: 'Tải ảnh mẫu đại diện cho style bạn muốn phân tích',
-    create_analyze_btn: '🔍 Phân Tích Style bằng AI',
+    create_analyze_btn: 'Phân Tích Style bằng AI',
     create_analyzing: 'Đang phân tích...',
     create_analyzing_title: 'AI đang phân tích ảnh của bạn...',
     create_analyzing_desc: 'Quá trình có thể mất 30-60 giây tùy thuộc vào số ảnh và nhà cung cấp AI.',
@@ -276,13 +276,13 @@ const translations: Record<Locale, TranslationKeys> = {
     settings_api_key: 'API Key',
     settings_base_url: 'Base URL',
     settings_model: 'Model',
-    settings_save_btn: '💾 Lưu Cài Đặt',
+    settings_save_btn: 'Lưu Cài Đặt',
     settings_cancel: 'Hủy',
     settings_saved: 'Đã lưu cài đặt!',
-    settings_test_btn: '🧪 Test',
+    settings_test_btn: 'Test',
     settings_testing: 'Đang test...',
-    settings_test_ok: '✅ Kết nối thành công!',
-    settings_test_fail: '❌ Kết nối thất bại: ',
+    settings_test_ok: 'Kết nối thành công!',
+    settings_test_fail: 'Kết nối thất bại: ',
     settings_enter_key: 'Nhập API Key trước khi test',
 
     lang_label: '🌐 Ngôn ngữ',
@@ -367,7 +367,7 @@ const translations: Record<Locale, TranslationKeys> = {
 
   en: {
     nav_title: 'Style Prompt Library',
-    nav_settings: '⚙️ Settings',
+    nav_settings: 'Settings',
     nav_new_style: '+ New Style',
 
     lib_title: 'Style Library',
@@ -383,7 +383,7 @@ const translations: Record<Locale, TranslationKeys> = {
     create_style_name_placeholder: 'e.g., Cyberpunk Noir, Watercolor Dreams...',
     create_drop_title: 'Drop images here or click to browse',
     create_drop_desc: 'Upload reference images that represent the style you want to analyze',
-    create_analyze_btn: '🔍 Analyze Style with AI',
+    create_analyze_btn: 'Analyze Style with AI',
     create_analyzing: 'Analyzing...',
     create_analyzing_title: 'AI is analyzing your images...',
     create_analyzing_desc: 'This may take 30-60 seconds depending on the number of images and your AI provider.',
@@ -443,13 +443,13 @@ const translations: Record<Locale, TranslationKeys> = {
     settings_api_key: 'API Key',
     settings_base_url: 'Base URL',
     settings_model: 'Model',
-    settings_save_btn: '💾 Save Settings',
+    settings_save_btn: 'Save Settings',
     settings_cancel: 'Cancel',
     settings_saved: 'Settings saved!',
-    settings_test_btn: '🧪 Test',
+    settings_test_btn: 'Test',
     settings_testing: 'Testing...',
-    settings_test_ok: '✅ Connection successful!',
-    settings_test_fail: '❌ Connection failed: ',
+    settings_test_ok: 'Connection successful!',
+    settings_test_fail: 'Connection failed: ',
     settings_enter_key: 'Enter an API Key before testing',
 
     lang_label: '🌐 Language',

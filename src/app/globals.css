@@ -115,7 +115,10 @@ html {
 
 body {
   font-family: var(--font-body);
-  background-color: var(--surface-0);
+  background: radial-gradient(ellipse 80% 60% at 20% 10%, rgba(66, 51, 122, 0.45) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 80% 85%, rgba(34, 60, 110, 0.4) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 55% 45%, rgba(50, 30, 90, 0.25) 0%, transparent 60%),
+    #08080C;
   color: var(--text-primary);
   line-height: 1.55;
   min-height: 100vh;
@@ -155,6 +158,23 @@ body::before {
   flex-shrink: 0;
 }
 
+/* ── Glassmorphism utilities ── */
+.glass {
+  background: rgba(14, 14, 20, 0.45);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.glass-lighter {
+  background: rgba(22, 22, 32, 0.55);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 1px 0 0 0 rgba(255, 255, 255, 0.04) inset;
+}
+
 .top-nav-item {
   display: flex;
   align-items: center;
@@ -163,7 +183,7 @@ body::before {
   border-radius: 6px;
   border: none;
   background: transparent;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -171,13 +191,13 @@ body::before {
 }
 
 .top-nav-item:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: #111;
+  background: var(--surface-2);
+  color: var(--text-primary);
 }
 
 .top-nav-item.active {
-  background: rgba(0, 0, 0, 0.06);
-  color: #111;
+  background: var(--surface-3);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -188,6 +208,15 @@ body::before {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+}
+
+.app-main-fullscreen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 .app-container {

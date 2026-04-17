@@ -109,7 +109,7 @@ export default function HomePage() {
       />
 
       {/* Main Content Area */}
-      <div className="app-main fade-in">
+      <div className={view === 'generate' || view === 'image_edit' ? "app-main-fullscreen fade-in" : "app-main fade-in"}>
         {view === 'library' && <LibraryView styles={styles} locale={locale} onSelect={(id) => { setSelectedStyleId(id); setView('edit'); }} onCreate={() => setView('create')} onDelete={handleDeleteStyle} />}
         {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
         {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onDelete={handleDeleteStyle} onUpdate={handleUpdateStyle} onGenerate={() => setView('generate')} showToast={showToast} />}

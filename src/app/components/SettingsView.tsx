@@ -26,10 +26,10 @@ export default function SettingsView({ settings, locale, onBack, onSave, showToa
   }, [activeTab]);
 
   const providers: Array<{ type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai'; name: string; icon: string }> = [
-    { type: 'openai', name: 'OpenAI', icon: '🟢' }, { type: 'anthropic', name: 'Anthropic', icon: '🟠' },
-    { type: 'openrouter', name: 'OpenRouter', icon: '🔵' }, { type: 'litellm', name: 'LiteLLM', icon: '🟣' },
-    { type: 'google', name: 'Google AI Studio', icon: '🔵' },
-    { type: 'vertexai', name: 'Google Vertex AI', icon: '🟡' },
+    { type: 'openai', name: 'OpenAI', icon: '' }, { type: 'anthropic', name: 'Anthropic', icon: '' },
+    { type: 'openrouter', name: 'OpenRouter', icon: '' }, { type: 'litellm', name: 'LiteLLM', icon: '' },
+    { type: 'google', name: 'Google AI Studio', icon: '' },
+    { type: 'vertexai', name: 'Google Vertex AI', icon: '' },
   ];
 
   const updateProvider = (type: 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'google' | 'vertexai', field: string, value: string) => {
@@ -322,7 +322,7 @@ export default function SettingsView({ settings, locale, onBack, onSave, showToa
                           if (imgs.length > 0) showToast(locale === 'vi' ? `✅ Thành công! Đã gen ${imgs.length} ảnh test.` : `✅ Success! Generated ${imgs.length} test image.`);
                         } catch (err) { showToast(`❌ ${err instanceof Error ? err.message : 'Connection failed'}`, 'error'); }
                       }}>
-                        🔌 {locale === 'vi' ? 'Test kết nối Image Gen' : 'Test Image Gen Connection'}
+                        {locale === 'vi' ? 'Test kết nối Image Gen' : 'Test Image Gen Connection'}
                       </button>
                     </div>
                   </div>
@@ -336,7 +336,7 @@ export default function SettingsView({ settings, locale, onBack, onSave, showToa
           <div className="slide-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
               <p style={{ color: 'var(--text-secondary)' }}>Application and API activity logs.</p>
-              <button className="btn btn-sm btn-secondary" onClick={() => { clearLogs(); setLogs([]); }}>🗑️ Clear Logs</button>
+              <button className="btn btn-sm btn-secondary" onClick={() => { clearLogs(); setLogs([]); }}>Clear Logs</button>
             </div>
             <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '16px', border: '1px solid var(--border-primary)' }}>
               {logs.length === 0 ? (
