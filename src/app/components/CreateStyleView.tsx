@@ -4,6 +4,7 @@ import { createEmptyPrompt, PROMPT_GROUPS } from '@/types';
 import { fileToBase64, generateId, callAI } from '@/lib/storage';
 import { type Locale, t, getGroupLabel, getFieldLabel } from '@/lib/i18n';
 import { setRefImages as idbSetRefImages, base64ToBlob, type RefImageRecord } from '@/lib/db';
+import { UploadCloud, FilePlus, Bot, X, FileImage, Layers } from 'lucide-react';
 
 export default function CreateStyleView({ settings, locale, onBack, onCreate, showToast }: {
   settings: AppSettings;
@@ -155,8 +156,9 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
 
           <div className={`upload-zone ${dragOver ? 'dragover' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop}
-            onClick={() => document.getElementById('file-input')?.click()}>
-            <div className="upload-zone-icon">📁</div>
+            onClick={() => document.getElementById('file-input')?.click()}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="upload-zone-icon"><UploadCloud size={48} strokeWidth={1} color="var(--accent-primary)" /></div>
             <div className="upload-zone-title">{L('create_drop_title')}</div>
             <div className="upload-zone-desc">{L('create_drop_desc')}</div>
             <input id="file-input" type="file" multiple accept="image/*" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
@@ -166,7 +168,7 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
             <div className="image-gallery">
               {images.map((img, i) => (
                 <div key={i} className="image-thumb"><img src={img} alt={`Upload ${i + 1}`} />
-                  <button className="image-thumb-remove" onClick={(e) => { e.stopPropagation(); setImages(prev => prev.filter((_, idx) => idx !== i)); }}>✕</button>
+                  <button className="image-thumb-remove" onClick={(e) => { e.stopPropagation(); setImages(prev => prev.filter((_, idx) => idx !== i)); }}><X size={14} /></button>
                 </div>
               ))}
             </div>
@@ -177,7 +179,7 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
               {analyzing ? <><span className="loading-spinner"></span> {L('create_analyzing')}</> : <>{L('create_analyze_btn')}</>}
             </button>
             <button className="btn btn-secondary btn-lg" onClick={handleCreateBlank} disabled={analyzing} style={{ width: '100%', marginTop: '12px' }}>
-              {locale === 'vi' ? '✍️ Tạo Style Trống (Thủ công)' : '✍️ Create Blank Style (Manual)'}
+              <FilePlus size={18} /> {locale === 'vi' ? ' Tạo Style Trống (Thủ công)' : ' Create Blank Style (Manual)'}
             </button>
           </div>
 
@@ -202,7 +204,7 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
               </div>
               {analysisResult.meta && (
                 <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '16px', borderLeft: '3px solid var(--accent-warning)' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-warning)', marginBottom: '4px' }}>🤖 AI Confidence: {analysisResult.meta.confidence}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-warning)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><Bot size={14} /> AI Confidence: {analysisResult.meta.confidence}</div>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{analysisResult.meta.notes}</p>
                 </div>
               )}
@@ -223,8 +225,8 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
                   });
                   if (filledFields.length === 0) return null;
                   return (
-                    <div key={group.key} style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent-primary)' }}>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '6px' }}>{group.icon} {groupLabel}</div>
+                    <div key={group.key} style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--border-active)' }}>
+                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}><Layers size={14} /> {groupLabel}</div>
                       {filledFields.slice(0, 3).map(([k, v]) => {
                         const locField = getFieldLabel(locale, group.key, k);
                         const label = locField.label || k.replace(/_/g, ' ');

@@ -3,6 +3,7 @@ import type { AppSettings, StyleLibrary, PromptSchema, RefineSuggestion } from '
 import { type Locale, t } from '@/lib/i18n';
 import { callRefinePrompt } from '@/lib/storage';
 import { type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
+import { Search, ClipboardCheck, Check } from 'lucide-react';
 
 export default function PromptRefinePanel({
     style,
@@ -69,7 +70,7 @@ export default function PromptRefinePanel({
         <div className="card" style={{ marginBottom: '24px', border: '2px dashed var(--accent-primary)', background: 'rgba(56, 189, 248, 0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h3 style={{ color: 'var(--accent-primary)', marginBottom: '4px' }}>🔍 AI Prompt Refiner</h3>
+                    <h3 style={{ color: 'var(--accent-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Search size={18} /> AI Prompt Refiner</h3>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                         {locale === 'vi' ? 'So sánh ảnh đã tạo với ảnh gốc để khắc phục lỗi lệch prompt (drift).' : 'Compare generation results with references to fix style drift.'}
                     </p>
@@ -82,7 +83,7 @@ export default function PromptRefinePanel({
             {suggestion && (
                 <div className="slide-in" style={{ marginTop: '16px', background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
                     <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '4px', borderLeft: '3px solid var(--accent-warning)', marginBottom: '16px' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-warning)' }}>📝 Mức độ tin cậy: {suggestion.confidence}</div>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}><ClipboardCheck size={14} /> Mức độ tin cậy: {suggestion.confidence}</div>
                         <p style={{ fontSize: '0.85rem', marginTop: '4px', color: 'var(--text-secondary)' }}>{suggestion.drift_summary}</p>
                     </div>
 
@@ -109,8 +110,8 @@ export default function PromptRefinePanel({
                         </table>
                     </div>
 
-                    <button className="btn btn-primary btn-lg" onClick={handleApply} style={{ marginTop: '16px', width: '100%' }}>
-                        ✅ Chấp nhận và Cập nhật Style Prompt
+                    <button className="btn btn-primary btn-lg" onClick={handleApply} style={{ marginTop: '16px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <Check size={18} /> Chấp nhận và Cập nhật Style Prompt
                     </button>
                 </div>
             )}

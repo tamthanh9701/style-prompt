@@ -5,6 +5,7 @@ import { type Locale, t } from '@/lib/i18n';
 import { getRefImages, putRefImage, deleteRefImage, type RefImageRecord, base64ToBlob } from '@/lib/db';
 import { fileToBase64 } from '@/lib/storage';
 import FieldInput from '@/app/components/FieldInput';
+import { Download, Upload, Save, Sparkles, List, Image as ImageIcon, Plus, Camera, Trash2 } from 'lucide-react';
 
 export default function EditStyleView({ style, settings, locale, onBack, onUpdate, onGenerate, showToast }: {
   style: StyleLibrary;
@@ -185,20 +186,20 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {isDirty && <span style={{ color: 'var(--accent-warning)', alignSelf: 'center', fontSize: '0.9rem', marginRight: '8px' }}>• Unsaved</span>}
-          <button className="btn btn-secondary" onClick={handleExportJson}>⬇️ {locale === 'vi' ? 'Xuất JSON' : 'Export JSON'}</button>
-          <label className="btn btn-secondary" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center' }}>
-            ⬆️ {locale === 'vi' ? 'Nhập JSON' : 'Import JSON'}
+          <button className="btn btn-secondary" onClick={handleExportJson}><Download size={16} /> {locale === 'vi' ? 'Xuất JSON' : 'Export JSON'}</button>
+          <label className="btn btn-secondary" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <Upload size={16} /> {locale === 'vi' ? 'Nhập JSON' : 'Import JSON'}
             <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportJson} />
           </label>
-          <button className="btn btn-secondary" onClick={handleSave} disabled={!isDirty}>💾 {locale === 'vi' ? 'Lưu' : 'Save'}</button>
-          <button className="btn btn-primary" onClick={() => { if (isDirty) handleSave(); onGenerate(); }}>✨ {locale === 'vi' ? 'Tạo ảnh' : 'Generate'}</button>
+          <button className="btn btn-secondary" onClick={handleSave} disabled={!isDirty}><Save size={16} /> {locale === 'vi' ? 'Lưu' : 'Save'}</button>
+          <button className="btn btn-primary" onClick={() => { if (isDirty) handleSave(); onGenerate(); }}><Sparkles size={16} /> {locale === 'vi' ? 'Tạo ảnh' : 'Generate'}</button>
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px' }}>
-        <button className={`tab-btn ${activeTab === 'schema' ? 'active' : ''}`} onClick={() => setActiveTab('schema')}>📋 Style Schema</button>
-        <button className={`tab-btn ${activeTab === 'images' ? 'active' : ''}`} onClick={() => setActiveTab('images')}>🖼️ Ref Images ({refRecords.length})</button>
+        <button className={`tab-btn ${activeTab === 'schema' ? 'active' : ''}`} onClick={() => setActiveTab('schema')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><List size={16} /> Style Schema</button>
+        <button className={`tab-btn ${activeTab === 'images' ? 'active' : ''}`} onClick={() => setActiveTab('images')} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ImageIcon size={16} /> Ref Images ({refRecords.length})</button>
       </div>
 
       {/* Tab Content */}
@@ -272,7 +273,7 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
               <p style={{ color: 'var(--text-secondary)' }}>Review & Prune: Remove degraded images to maintain high fidelity style.</p>
               <div>
                 <input type="file" id="add-ref" hidden multiple accept="image/*" onChange={handleAddImageUpload} />
-                <button className="btn btn-secondary" onClick={() => document.getElementById('add-ref')?.click()}>➕ Add Referene Images</button>
+                <button className="btn btn-secondary" onClick={() => document.getElementById('add-ref')?.click()}><Plus size={16} /> Add Reference Images</button>
               </div>
             </div>
 
@@ -284,9 +285,9 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
                   <div key={r.id} className="card" style={{ padding: '8px', position: 'relative' }}>
                     <img src={imageUrls[r.id]} alt="Ref" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '4px' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.source === 'generated' ? '✨ Gen' : '📸 Orig'}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>{r.source === 'generated' ? <><Sparkles size={12} /> Gen</> : <><Camera size={12} /> Orig</>}</span>
                       <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-danger)' }} onClick={() => handlePruneImage(r)}>
-                        🗑️ Prune
+                        <Trash2 size={14} /> Prune
                       </button>
                     </div>
                   </div>

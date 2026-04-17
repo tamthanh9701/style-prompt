@@ -5,6 +5,7 @@ import { callImageGen, generateId, fileToBase64 } from '@/lib/storage';
 import { saveGenImage, getGenImages, getRefImages, putRefImage, type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
 import { flattenPrompt } from '@/types';
 import PromptRefinePanel from '@/app/components/PromptRefinePanel';
+import { Paperclip, Sparkles, Rocket, PenTool, Star } from 'lucide-react';
 
 export default function GenerateView({ style, settings, locale, onBack, onUpdate, showToast, onRequestEdit }: {
   style: StyleLibrary;
@@ -197,7 +198,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
             </div>
             <div style={{ marginTop: '16px', background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label className="form-label" style={{ marginBottom: 0 }}>📎 Ref Images ({totalSelectedRefs}/4)</label>
+                <label className="form-label" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: '4px' }}><Paperclip size={14} /> Ref Images ({totalSelectedRefs}/4)</label>
                 <label style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', cursor: 'pointer' }}>
                   + Temp Ref
                   <input type="file" multiple accept="image/*" hidden onChange={handleTempRefUpload} />
@@ -228,7 +229,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           </div>
 
           <div className="card" style={{ border: '2px solid var(--accent-primary)' }}>
-            <label className="form-label" style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>[CONTENT IDEA] ✨</label>
+            <label className="form-label" style={{ color: 'var(--accent-primary)', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>[CONTENT IDEA] <Sparkles size={18} /></label>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>What subjects/items do you want to draw in this style?</p>
             <textarea
               className="form-input"
@@ -270,7 +271,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
           </div>
 
           <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 'auto' }} onClick={handleGenerate} disabled={generating}>
-            {generating ? <span className="loading-spinner"></span> : '🚀 Generate Image'}
+            {generating ? <span className="loading-spinner"></span> : <><Rocket size={18} style={{ marginRight: '8px' }} /> Generate Image</>}
           </button>
         </div>
 
@@ -303,11 +304,11 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {onRequestEdit && (
                         <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-primary)', border: '1px solid var(--accent-primary)' }} onClick={() => onRequestEdit(img.id)} title="Edit this image with prompts">
-                          🖌️ Edit
+                          <PenTool size={14} /> Edit
                         </button>
                       )}
                       <button className="btn btn-sm" style={{ background: 'var(--bg-glass-hover)', color: 'var(--accent-warning)', border: '1px solid var(--accent-warning)' }} onClick={() => handlePromote(img)} title="Mark as high-fidelity and use as a style reference">
-                        ⭐ Promote to Ref
+                        <Star size={14} /> Promote to Ref
                       </button>
                     </div>
                   </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { StyleLibrary, StyleStatus } from '@/types';
 import { type Locale, t } from '@/lib/i18n';
 import { getRefImages, getRefImageById } from '@/lib/db';
+import { ImageIcon, CircleDot, CheckCircle2, XCircle, List, FileImage } from 'lucide-react';
 
 function LibraryCoverImage({ libraryId, coverImageId }: { libraryId: string, coverImageId: string | null | undefined }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -35,7 +36,7 @@ function LibraryCoverImage({ libraryId, coverImageId }: { libraryId: string, cov
   }, [libraryId, coverImageId]);
 
   if (!url) {
-    return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '2rem' }}>🖼️</div>;
+    return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--border-hover)' }}><ImageIcon size={48} strokeWidth={1} /></div>;
   }
 
   return <img src={url} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
@@ -52,13 +53,13 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
   const [statusFilter, setStatusFilter] = useState<StyleStatus | 'all'>('all');
   const filteredStyles = statusFilter === 'all' ? styles.filter(s => (s.status || 'active') !== 'deprecated') : styles.filter(s => (s.status || 'active') === statusFilter);
   const statusBadge = (status: StyleStatus) => {
-    const map: Record<StyleStatus, { emoji: string; color: string; label: string }> = {
-      draft: { emoji: '🟡', color: 'rgba(234,179,8,0.15)', label: 'Draft' },
-      active: { emoji: '🟢', color: 'rgba(34,197,94,0.15)', label: 'Active' },
-      deprecated: { emoji: '⚫', color: 'rgba(100,100,100,0.15)', label: 'Deprecated' },
+    const map: Record<StyleStatus, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
+      draft: { icon: <CircleDot size={12} />, color: '#EAB308', bg: 'rgba(234,179,8,0.15)', label: 'Draft' },
+      active: { icon: <CheckCircle2 size={12} />, color: '#22C55E', bg: 'rgba(34,197,94,0.15)', label: 'Active' },
+      deprecated: { icon: <XCircle size={12} />, color: '#64748B', bg: 'rgba(100,100,100,0.15)', label: 'Deprecated' },
     };
     const s = map[status] || map.active;
-    return <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: s.color, whiteSpace: 'nowrap' }}>{s.emoji} {s.label}</span>;
+    return <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '12px', background: s.bg, color: s.color, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', fontWeight: 500 }}>{s.icon} {s.label}</span>;
   };
   return (
     <div>
@@ -68,8 +69,11 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
         {(['all', 'active', 'draft', 'deprecated'] as const).map(f => (
           <button key={f} className={`btn btn-sm ${statusFilter === f ? 'btn-primary' : ''}`}
             onClick={() => setStatusFilter(f)}
-            style={{ fontSize: '0.8rem' }}>
-            {f === 'all' ? (locale === 'vi' ? '📋 Tất cả' : '📋 All') : f === 'active' ? '🟢 Active' : f === 'draft' ? '🟡 Draft' : '⚫ Deprecated'}
+            style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {f === 'all' ? <><List size={14} /> {locale === 'vi' ? 'Tất cả' : 'All'}</> :
+              f === 'active' ? <><CheckCircle2 size={14} /> Active</> :
+                f === 'draft' ? <><CircleDot size={14} /> Draft</> :
+                  <><XCircle size={14} /> Deprecated</>}
           </button>
         ))}
         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -77,8 +81,8 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
         </span>
       </div>
       {filteredStyles.length === 0 && styles.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">🖼️</div>
+        <div className="empty-state" style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)' }}>
+          <div className="empty-state-icon" style={{ opacity: 0.5, marginBottom: '16px', display: 'flex', justifyContent: 'center' }}><ImageIcon size={48} strokeWidth={1} color="var(--accent-primary)" /></div>
           <h2 className="empty-state-title">{L('lib_empty_title')}</h2>
           <p className="empty-state-desc">{L('lib_empty_desc')}</p>
           <button className="btn btn-primary btn-lg" onClick={onCreate}>{L('lib_empty_btn')}</button>
@@ -102,9 +106,9 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
                   {statusBadge(style.status || 'active')}
                 </div>
                 <div className="style-card-meta">
-                  <span className="style-card-badge">{style.prompt.subject_type}</span>
+                  <span className="style-card-badge">{style.prompt.subject_type || 'Custom'}</span>
                   <span style={{ fontSize: '0.7rem' }}>v{style.version || 1}</span>
-                  <span>{style.ref_image_count || 0} {L('lib_images')}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FileImage size={12} /> {style.ref_image_count || 0} {L('lib_images')}</span>
                   <span>{new Date(style.updated_at).toLocaleDateString()}</span>
                 </div>
               </div>
