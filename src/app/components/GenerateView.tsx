@@ -210,18 +210,6 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', flexShrink: 0, borderBottom: '1px solid var(--border-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button className="btn btn-sm" onClick={onBack} style={{ border: 'none', padding: '6px' }}><ArrowLeft size={18} /></button>
-          <div>
-            <h1 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>{style.name}</h1>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Generate Mode</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.7rem', padding: '3px 10px', borderRadius: '999px', background: 'rgba(26,115,232,0.1)', color: 'var(--accent-primary)', fontWeight: 500 }}>
-            {aspectRatio} • {sampleCount} img
-          </span>
-          <button className="btn btn-sm" onClick={() => setShowAdvanced(!showAdvanced)} style={{ border: '1px solid var(--border-primary)', borderRadius: '999px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Settings2 size={14} /> {showAdvanced ? 'Ẩn cài đặt' : 'Cài đặt'}
-          </button>
         </div>
       </div>
 
@@ -237,13 +225,10 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
               <h2 style={{ fontSize: '1.8rem', fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
                 {locale === 'vi' ? 'Bạn muốn tạo gì hôm nay?' : 'What do you want to create?'}
               </h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                {locale === 'vi' ? 'Mô tả ý tưởng và AI sẽ tạo ảnh theo style của bạn.' : 'Describe your idea and AI will generate in your style.'}
-              </p>
             </div>
           )}
 
-          {/* Suggestion Chips (only when empty) */}
+          {/* Suggestion Chips */}
           {genImages.length === 0 && !generating && !hasContent && (
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '24px' }}>
               {[
@@ -274,8 +259,8 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
             style={{
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid var(--border-primary)',
-              borderRadius: '16px',
-              padding: '20px',
+              borderRadius: '24px',
+              padding: '24px',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
@@ -283,10 +268,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
             }}
           >
             {/* Mode Toggle inside input box */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={16} /> Content Idea
-              </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-glass)', padding: '3px', borderRadius: '8px' }}>
                 <div onClick={() => setContentMode('multi-item')} style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, background: contentMode === 'multi-item' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'multi-item' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}>Multi-Item</div>
                 <div onClick={() => setContentMode('freeform')} style={{ padding: '4px 10px', fontSize: '0.7rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, background: contentMode === 'freeform' ? 'var(--accent-primary)' : 'transparent', color: contentMode === 'freeform' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}>Free-form</div>
@@ -297,23 +279,21 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
             {contentMode === 'freeform' ? (
               <textarea
                 placeholder={locale === 'vi' ? 'Mô tả chi tiết ý tưởng của bạn...' : 'Describe your content idea in detail...'}
-                rows={4}
+                rows={3}
                 value={contentIdea}
                 onChange={(e) => setContentIdea(e.target.value)}
-                style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none', resize: 'none', minHeight: '80px', fontFamily: 'inherit', lineHeight: 1.6 }}
+                style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.1rem', outline: 'none', resize: 'none', minHeight: '60px', fontFamily: 'inherit', lineHeight: 1.6 }}
               />
             ) : (
               <div>
-                {/* Chips display */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: contentItems.length > 0 ? '12px' : '0' }}>
                   {contentItems.map((item, idx) => (
-                    <div key={idx} style={{ background: 'rgba(26,115,232,0.1)', border: '1px solid rgba(26,115,232,0.2)', borderRadius: '999px', padding: '6px 14px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', animation: 'fadeIn 0.2s ease-out' }}>
+                    <div key={idx} style={{ background: 'rgba(26,115,232,0.1)', border: '1px solid rgba(26,115,232,0.2)', borderRadius: '999px', padding: '6px 14px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', animation: 'fadeIn 0.2s ease-out' }}>
                       <span>{item}</span>
-                      <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: 0, cursor: 'pointer', lineHeight: 1, display: 'flex' }} onClick={() => handleRemoveItem(idx)}><X size={12} /></button>
+                      <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: 0, cursor: 'pointer', lineHeight: 1, display: 'flex' }} onClick={() => handleRemoveItem(idx)}><X size={14} /></button>
                     </div>
                   ))}
                 </div>
-                {/* Add input */}
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="text"
@@ -322,114 +302,124 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                     onChange={e => setNewItemText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddItem(); } }}
                     disabled={contentItems.length >= 10}
-                    style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.95rem', outline: 'none', fontFamily: 'inherit' }}
+                    style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.1rem', outline: 'none', fontFamily: 'inherit' }}
                   />
-                  <span style={{ fontSize: '0.7rem', color: contentItems.length >= 10 ? 'var(--accent-danger)' : 'var(--text-muted)', flexShrink: 0 }}>{contentItems.length}/10</span>
+                  <span style={{ fontSize: '0.75rem', color: contentItems.length >= 10 ? 'var(--accent-danger)' : 'var(--text-muted)', flexShrink: 0 }}>{contentItems.length}/10</span>
                 </div>
               </div>
             )}
 
             {/* Reference Images inline preview */}
             {(refRecords.length > 0 || adHocRefs.length > 0) && (
-              <div style={{ display: 'flex', gap: '6px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', overflowX: 'auto' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0, marginRight: '4px' }}>Refs ({totalSelectedRefs}/4)</span>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', overflowX: 'auto' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0, marginRight: '4px' }}>Refs ({totalSelectedRefs}/4)</span>
                 {refRecords.map(r => {
                   const isSel = selectedRefIds.has(r.id);
                   return (
-                    <div key={r.id} onClick={() => handleRefToggle(r.id)} style={{ position: 'relative', width: '36px', height: '36px', flexShrink: 0, cursor: 'pointer', borderRadius: '6px', overflow: 'hidden', border: isSel ? '2px solid var(--accent-primary)' : '2px solid transparent', opacity: isSel ? 1 : 0.35, transition: 'all 0.2s' }}>
+                    <div key={r.id} onClick={() => handleRefToggle(r.id)} style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, cursor: 'pointer', borderRadius: '8px', overflow: 'hidden', border: isSel ? '2px solid var(--accent-primary)' : '2px solid transparent', opacity: isSel ? 1 : 0.35, transition: 'all 0.2s' }}>
                       <img src={renderObjUrl(r.data)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="ref" />
                     </div>
                   );
                 })}
                 {adHocRefs.map(r => (
-                  <div key={r.id} style={{ position: 'relative', width: '36px', height: '36px', flexShrink: 0, borderRadius: '6px', overflow: 'hidden', border: '2px solid var(--accent-warning)' }}>
+                  <div key={r.id} style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--accent-warning)' }}>
                     <img src={r.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="adhoc" />
-                    <button onClick={(e) => { e.stopPropagation(); handeRemoveAdHoc(r.id); }} style={{ position: 'absolute', top: -1, right: -1, background: 'var(--accent-danger)', color: '#fff', fontSize: '8px', width: '12px', height: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>✕</button>
+                    <button onClick={(e) => { e.stopPropagation(); handeRemoveAdHoc(r.id); }} style={{ position: 'absolute', top: -1, right: -1, background: 'var(--accent-danger)', color: '#fff', fontSize: '10px', width: '16px', height: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}>✕</button>
                   </div>
                 ))}
               </div>
             )}
 
+            {/* ── INLINE ADVANCED SETTINGS ── */}
+            {showAdvanced && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)', animation: 'fadeIn 0.3s ease-out' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px' }}>
+
+                  {/* Left Column Settings */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Aspect Ratio</label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {['1:1', '16:9', '9:16', '3:2'].map(ratio => (
+                          <button key={ratio} className="btn btn-sm" style={{ padding: '6px 12px', background: aspectRatio === ratio ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: aspectRatio === ratio ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.8rem' }} onClick={() => setAspectRatio(ratio)}>
+                            {ratio}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Images Count</label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {[1, 2, 4].map(num => (
+                          <button key={num} className="btn btn-sm" style={{ padding: '6px 16px', background: sampleCount === num ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: 'none', color: sampleCount === num ? '#fff' : 'var(--text-secondary)', borderRadius: '999px', fontSize: '0.8rem' }} onClick={() => setSampleCount(num)}>
+                            {num}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Camera Angle</label>
+                      <input type="text" className="form-input" placeholder="e.g. Low angle, zoomed" value={cameraAngle} onChange={(e) => setCameraAngle(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none' }} />
+                    </div>
+                  </div>
+
+                  {/* Right Column Settings */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Negative Prompt</label>
+                      <textarea className="form-input" rows={2} placeholder="Things to exclude..." value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', minHeight: '60px' }} />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '8px' }}>Dominant Color</label>
+                      <input type="text" className="form-input" placeholder="e.g. Neon Pink" value={dominantColor} onChange={(e) => setDominantColor(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: 'none' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Bottom Action Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  style={{ borderRadius: '999px', background: showAdvanced ? 'rgba(255,255,255,0.1)' : 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Settings2 size={15} /> {locale === 'vi' ? 'Cài đặt' : 'Settings'}
+                </button>
                 <label
                   className="btn btn-sm"
-                  style={{ borderRadius: '999px', background: 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ borderRadius: '999px', background: 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  <Paperclip size={13} /> {locale === 'vi' ? 'Đính kèm' : 'Attach'}
+                  <Paperclip size={15} /> {locale === 'vi' ? 'Đính kèm' : 'Attach'}
                   <input type="file" multiple accept="image/*" hidden onChange={handleTempRefUpload} />
                 </label>
               </div>
+
               <button
                 className="btn btn-primary"
                 onClick={handleGenerate}
                 disabled={generating || !hasContent}
                 style={{
                   borderRadius: '999px',
-                  padding: '8px 24px',
+                  padding: '10px 28px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  background: hasContent ? 'white' : 'var(--bg-tertiary)',
-                  color: hasContent ? '#111' : 'var(--text-muted)',
+                  background: hasContent ? '#fff' : 'rgba(255,255,255,0.05)',
+                  color: hasContent ? '#000' : 'var(--text-muted)',
                   fontWeight: 600,
                   transition: 'all 0.3s ease',
                   border: 'none',
+                  boxShadow: hasContent ? '0 4px 14px rgba(255,255,255,0.2)' : 'none'
                 }}
               >
-                {generating ? <span className="loading-spinner" style={{ width: '16px', height: '16px' }}></span> : <Rocket size={14} />}
+                {generating ? <span className="loading-spinner" style={{ width: '16px', height: '16px', borderColor: '#000', borderTopColor: 'transparent' }}></span> : <Rocket size={16} />}
                 {generating ? (locale === 'vi' ? 'Đang tạo...' : 'Generating...') : (locale === 'vi' ? 'Tạo ảnh' : 'Generate')}
               </button>
             </div>
           </div>
-
-          {/* ── ADVANCED SETTINGS (Collapsible, below input) ── */}
-          {showAdvanced && (
-            <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '16px', animation: 'fadeIn 0.3s ease-out' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Camera Angle</label>
-                  <input type="text" className="form-input" placeholder="e.g. Low angle" value={cameraAngle} onChange={(e) => setCameraAngle(e.target.value)} />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Dominant Color</label>
-                  <input type="text" className="form-input" placeholder="e.g. Neon Pink" value={dominantColor} onChange={(e) => setDominantColor(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="form-label" style={{ fontSize: '0.75rem' }}>Negative Prompt</label>
-                <textarea className="form-input" rows={2} value={negativePrompt} onChange={(e) => setNegativePrompt(e.target.value)} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Aspect Ratio</label>
-                  <select className="form-input" value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value)}>
-                    <option value="1:1">1:1 Square</option>
-                    <option value="16:9">16:9 Landscape</option>
-                    <option value="9:16">9:16 Portrait</option>
-                    <option value="3:2">3:2 Photo</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>Count</label>
-                  <select className="form-input" value={sampleCount} onChange={(e) => setSampleCount(Number(e.target.value))}>
-                    <option value="1">1 Image</option>
-                    <option value="2">2 Images</option>
-                    <option value="4">4 Images</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Style DNA Preview */}
-              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                <label className="form-label" style={{ fontSize: '0.7rem', color: 'var(--accent-warning)', display: 'flex', alignItems: 'center', gap: '4px' }}>Style DNA (read-only)</label>
-                <div style={{ background: 'var(--bg-tertiary)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '80px', overflowY: 'auto', fontFamily: 'monospace', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  {flattenPrompt(style.prompt as PromptSchema).positive.substring(0, 300)}...
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── PROMPT REFINE PANEL ── */}
