@@ -290,7 +290,7 @@ export async function callAI(
   settings: AppSettings,
   action: 'analyzeStyle',
   images: string[],
-  options?: { prompt_context?: string; reference_images?: string[] }
+  options?: { prompt_context?: string; reference_images?: string[]; user_feedback?: string; feedback_images?: string[] }
 ) {
   const { logger, startTimer } = await import('./logger');
   const provider = settings.providers[settings.active_provider];
@@ -407,6 +407,7 @@ export async function callImageGen(
     reference_images?: string[];
     sample_count?: number;
     seed?: number;
+    signal?: AbortSignal;
   }
 ): Promise<string[]> {
   const cfg = settings.image_gen;
@@ -419,6 +420,7 @@ export async function callImageGen(
 
   const response = await fetch('/api/imagen', {
     method: 'POST',
+    signal: options?.signal,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       MANDATORY_STYLE: payload.MANDATORY_STYLE,
@@ -457,10 +459,14 @@ export async function callRefinePrompt(
   settings: AppSettings,
   generatedImages: string[],
   referenceImages: string[],
-  currentPrompt: import('@/types').PromptSchema
+  currentPrompt: import('@/types').PromptSchema,
+  userFeedback?: string,
+  feedbackImages?: string[]
 ): Promise<import('@/types').RefineSuggestion> {
   return callAI(settings, 'refinePrompt' as any, generatedImages, {
     reference_images: referenceImages,
-    prompt_context: JSON.stringify(currentPrompt)
+    prompt_context: JSON.stringify(currentPrompt),
+    user_feedback: userFeedback,
+    feedback_images: feedbackImages
   }) as Promise<import('@/types').RefineSuggestion>;
 }

@@ -18,6 +18,8 @@ interface AIRequestBody {
   images: string[]; // base64 data URLs
   prompt_context?: string; // existing prompt JSON for comparison
   reference_images?: string[]; // reference style images for comparison
+  user_feedback?: string;
+  feedback_images?: string[];
   // Vertex AI specific
   vertex_project?: string;
   vertex_location?: string;
@@ -37,9 +39,11 @@ function extractBase64(dataUrl: string): { base64: string; mediaType: string } {
 // System prompts for each action
 // ============================================================
 
-const REFINE_PROMPT_SYSTEM = `You are a style prompt refinement expert. You will receive two groups of images. We combine them into one array, but you should treat the first ones as [GENERATED] (what the AI produced) and the later ones as [REFERENCE] (the ground truth style).
+const REFINE_PROMPT_SYSTEM = `You are a style prompt refinement expert. You will receive up to three groups of images. We combine them into one array, but you should treat the first ones as [GENERATED] (what the AI produced), the next ones as [FEEDBACK] (what the user actually wanted - target state), and the last ones as [REFERENCE] (the original ground truth style context).
 
-Compare them and identify style DRIFT — differences in lighting, color palette, composition, texture, mood, etc.
+Additionally, the user may provide text feedback detailing what they want improved.
+
+Compare the [GENERATED] images against the [FEEDBACK] and [REFERENCE] images, incorporating the user's feedback text, to identify style and content DRIFT — differences in lighting, color palette, composition, texture, mood, etc. Provide recommendations to adjust the prompt to achieve the user's desired output.
 
 Return a JSON object:
 {
@@ -630,8 +634,22 @@ export async function POST(request: NextRequest) {
 
       case 'refinePrompt':
         systemPrompt = REFINE_PROMPT_SYSTEM;
-        userMessage = `Compare the following images. The first ${images.length} images are [GENERATED]. The next ${body.reference_images?.length || 0} images are [REFERENCE]. Identify any drift. Here is the current prompt context for reference: ${body.prompt_context}`;
-        allImages = [...images, ...(body.reference_images || [])];
+        const totalGenImgs = images.length;
+        const totalFeedbackImgs = body.feedback_images?.length || 0;
+        const totalRefImgs = body.reference_images?.length || 0;
+
+        let msgParts = [`Compare the following images.`];
+        msgParts.push(`The first ${totalGenImgs} images are [GENERATED].`);
+        if (totalFeedbackImgs > 0) msgParts.push(`The next ${totalFeedbackImgs} images are [FEEDBACK] (Target state).`);
+        if (totalRefImgs > 0) msgParts.push(`The final ${totalRefImgs} images are [REFERENCE] (Ground truth style context).`);
+
+        msgParts.push(`Here is the current prompt context for reference: ${body.prompt_context || '{}'}`);
+        if (body.user_feedback) {
+          msgParts.push(`User Feedback on what needs to change: "${body.user_feedback}"`);
+        }
+
+        userMessage = msgParts.join('\n');
+        allImages = [...images, ...(body.feedback_images || []), ...(body.reference_images || [])];
         break;
 
       default:

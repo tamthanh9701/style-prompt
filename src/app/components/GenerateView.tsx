@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { StyleLibrary, AppSettings, PromptSchema } from '@/types';
 import { type Locale, t } from '@/lib/i18n';
 import { callImageGen, generateId, fileToBase64 } from '@/lib/storage';
 import { saveGenImage, getGenImages, getRefImages, putRefImage, deleteGenImage, type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
 import { flattenPrompt } from '@/types';
 import PromptRefinePanel from '@/app/components/PromptRefinePanel';
-import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud, Settings2, ChevronDown, ChevronUp, ImageIcon, X, ArrowLeft, ZoomIn, Maximize2, Trash2 } from 'lucide-react';
+import { Paperclip, Sparkles, Rocket, PenTool, Star, DownloadCloud, Settings2, ChevronDown, ChevronUp, ImageIcon, X, ArrowLeft, ZoomIn, Maximize2, Trash2, Square } from 'lucide-react';
 
 export default function GenerateView({ style, settings, locale, onBack, onUpdate, showToast, onRequestEdit }: {
   style: StyleLibrary;
@@ -43,6 +43,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
   const [viewerImage, setViewerImage] = useState<GenImageRecord | null>(null);
   const [genProgress, setGenProgress] = useState<string[]>([]);
   const [adHocRefs, setAdHocRefs] = useState<{ id: string; data: string; mimeType: string }[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
 
@@ -126,6 +127,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
     setGenerating(true);
     setGenProgress([]);
     try {
+      abortControllerRef.current = new AbortController();
       setGenProgress(p => [...p, locale === 'vi' ? '✨ Đang chuẩn bị prompt...' : '✨ Preparing prompt...']);
       const flatStyle = flattenPrompt(style.prompt as PromptSchema);
       const selectedLibRefs = refRecords.filter(r => selectedRefIds.has(r.id));
@@ -189,7 +191,8 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
         negative_prompt: negativePrompt,
         aspect_ratio: aspectRatio,
         sample_count: sampleCount,
-        reference_images: b64Refs
+        reference_images: b64Refs,
+        signal: abortControllerRef.current?.signal
       });
 
       setGenProgress(p => [...p, locale === 'vi'
@@ -219,7 +222,11 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
       setGenProgress(p => [...p, locale === 'vi' ? '🎉 Hoàn tất!' : '🎉 Done!']);
       showToast(locale === 'vi' ? `Tạo thành công ${imagesB64.length} ảnh!` : `Generated ${imagesB64.length} images!`);
     } catch (err: any) {
-      showToast(err.message || 'Generation failed', 'error');
+      if (err.name === 'AbortError') {
+        showToast(locale === 'vi' ? 'Đã hủy tạo ảnh' : 'Generation canceled');
+      } else {
+        showToast(err.message || 'Generation failed', 'error');
+      }
     } finally {
       setGenerating(false);
       // Clear progress after a delay so user can see the final state
@@ -471,11 +478,17 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }} className="hide-scrollbar">
 
-                  {/* Mode Pill */}
-                  <button onClick={() => setContentMode(contentMode === 'freeform' ? 'multi-item' : 'freeform')}
-                    style={{ background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: 500 }}>
-                    {contentMode === 'freeform' ? 'Free-form' : 'Multi-Item'}
-                  </button>
+                  {/* Mode Pill -> Select Dropdown */}
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', background: 'var(--surface-3)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '3px 6px 3px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    <select
+                      value={contentMode} onChange={e => setContentMode(e.target.value as 'freeform' | 'multi-item')}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', paddingRight: '14px' }}
+                    >
+                      <option value="multi-item">{locale === 'vi' ? 'Nhiều vật phẩm' : 'Multi-Item'}</option>
+                      <option value="freeform">{locale === 'vi' ? 'Tự do' : 'Free-form'}</option>
+                    </select>
+                    <ChevronDown size={10} style={{ position: 'absolute', right: 6, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
+                  </div>
 
                   {/* Aspect Ratio */}
                   <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--surface-3)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '3px 6px 3px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
@@ -509,15 +522,19 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                   <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', background: 'var(--surface-3)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '3px 6px 3px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                     <select
                       value={cameraAngle} onChange={e => setCameraAngle(e.target.value)}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', paddingRight: '14px' }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none', paddingRight: '14px', maxWidth: '100px' }}
                     >
-                      <option value="">Angle</option>
-                      <option value="Isometric">Isometric</option>
-                      <option value="Low Angle">Low Angle</option>
-                      <option value="Eye-Level">Eye-Level</option>
-                      <option value="Top-Down">Top-Down</option>
-                      <option value="Bird's Eye">Bird's Eye</option>
-                      <option value="3/4 View">3/4 View</option>
+                      <option value="">{locale === 'vi' ? 'Góc máy' : 'Angle'}</option>
+                      {[
+                        { value: 'Isometric', vi: 'Góc đẳng cự', en: 'Isometric' },
+                        { value: 'Low Angle', vi: 'Góc thấp', en: 'Low Angle' },
+                        { value: 'Eye-Level', vi: 'Ngang tầm mắt', en: 'Eye-Level' },
+                        { value: 'Top-Down', vi: 'Nhìn từ trên', en: 'Top-Down' },
+                        { value: "Bird's Eye", vi: 'Mắt chim', en: "Bird's Eye" },
+                        { value: '3/4 View', vi: 'Góc 3/4', en: '3/4 View' },
+                      ].map(opt => (
+                        <option key={opt.value} value={opt.value}>{locale === 'vi' ? opt.vi : opt.en}</option>
+                      ))}
                     </select>
                     <ChevronDown size={10} style={{ position: 'absolute', right: 6, pointerEvents: 'none', color: 'var(--text-secondary)' }} />
                   </div>
@@ -529,20 +546,43 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                 </div>
 
                 <div style={{ paddingLeft: '12px' }}>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={generating || !hasContent}
-                    style={{
-                      width: '32px', height: '32px', borderRadius: '50%',
-                      background: hasContent ? 'var(--accent)' : 'var(--surface-3)',
-                      color: hasContent ? '#FFF' : 'var(--text-muted)',
-                      border: 'none', cursor: hasContent ? 'pointer' : 'not-allowed',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0,
-                      boxShadow: hasContent ? '0 2px 8px rgba(66,133,244,0.35)' : 'none'
-                    }}
-                  >
-                    {generating ? <span className="loading-spinner" style={{ width: '12px', height: '12px', borderColor: '#FFF', borderTopColor: 'transparent' }}></span> : <Rocket size={14} />}
-                  </button>
+                  {generating ? (
+                    <button
+                      onClick={() => {
+                        if (abortControllerRef.current) {
+                          abortControllerRef.current.abort();
+                          abortControllerRef.current = null;
+                        }
+                      }}
+                      style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        background: 'var(--bg-error, #ef4444)',
+                        color: 'white',
+                        border: 'none', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                      }}
+                      title={locale === 'vi' ? 'Dừng Gen (Stop)' : 'Stop Generaton'}
+                    >
+                      <Square size={14} fill="currentColor" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleGenerate}
+                      disabled={generating || !hasContent}
+                      style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        background: hasContent ? 'var(--accent)' : 'var(--surface-3)',
+                        color: hasContent ? '#FFF' : 'var(--text-muted)',
+                        border: 'none', cursor: hasContent ? 'pointer' : 'not-allowed',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0,
+                        boxShadow: hasContent ? '0 2px 8px rgba(66,133,244,0.35)' : 'none'
+                      }}
+                      title={locale === 'vi' ? 'Gen Ảnh' : 'Generate'}
+                    >
+                      <Rocket size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

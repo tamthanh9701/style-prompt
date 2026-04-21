@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import type { AppSettings, StyleLibrary, PromptSchema, RefineSuggestion } from '@/types';
 import { type Locale, t } from '@/lib/i18n';
-import { callRefinePrompt } from '@/lib/storage';
+import { callRefinePrompt, fileToBase64, generateId } from '@/lib/storage';
 import { type GenImageRecord, type RefImageRecord, blobToBase64 } from '@/lib/db';
-import { Search, ClipboardCheck, Check } from 'lucide-react';
+import { Search, ClipboardCheck, Check, X } from 'lucide-react';
 
 export default function PromptRefinePanel({
     style,
@@ -24,6 +24,29 @@ export default function PromptRefinePanel({
 }) {
     const [analyzing, setAnalyzing] = useState(false);
     const [suggestion, setSuggestion] = useState<RefineSuggestion | null>(null);
+    const [userFeedback, setUserFeedback] = useState<string>('');
+    const [feedbackImages, setFeedbackImages] = useState<{ id: string; data: string; mimeType: string }[]>([]);
+
+    const handleFeedbackPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+        const files = Array.from(e.target.files);
+        const spotsLeft = 4 - feedbackImages.length;
+        if (spotsLeft <= 0) {
+            showToast(locale === 'vi' ? 'Tối đa 4 ảnh phản hồi' : 'Max 4 feedback images', 'warning');
+            return;
+        }
+        let added = 0;
+        for (const file of files) {
+            if (added >= spotsLeft) break;
+            const b64 = await fileToBase64(file);
+            setFeedbackImages(prev => [...prev, { id: `fb_${generateId()}`, data: b64, mimeType: file.type }]);
+            added++;
+        }
+    };
+
+    const handleRemoveFeedbackImage = (id: string) => {
+        setFeedbackImages(prev => prev.filter(img => img.id !== id));
+    };
 
     const handleAnalyze = async () => {
         if (genImages.length === 0 || refRecords.length === 0) {
@@ -42,8 +65,16 @@ export default function PromptRefinePanel({
                 return '';
             }));
             const b64Ref = await Promise.all(rImgs.map(i => blobToBase64(i.data)));
+            const b64Feedback = feedbackImages.map(f => f.data);
 
-            const result = await callRefinePrompt(settings, b64Gen.filter(Boolean), b64Ref, style.prompt as PromptSchema);
+            const result = await callRefinePrompt(
+                settings,
+                b64Gen.filter(Boolean),
+                b64Ref,
+                style.prompt as PromptSchema,
+                userFeedback.trim() || undefined,
+                b64Feedback.length > 0 ? b64Feedback : undefined
+            );
             setSuggestion(result);
         } catch (err: any) {
             showToast(err.message || 'Drift Analysis failed', 'error');
@@ -78,6 +109,42 @@ export default function PromptRefinePanel({
                 <button className="btn btn-primary" onClick={handleAnalyze} disabled={analyzing || genImages.length === 0 || refRecords.length === 0}>
                     {analyzing ? <span className="loading-spinner" /> : (locale === 'vi' ? 'Phân tích Drift' : 'Analyze Drift')}
                 </button>
+            </div>
+
+            {/* New Input UI */}
+            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <textarea
+                    placeholder={locale === 'vi' ? 'Nhập nhận xét của bạn về ảnh đã tạo so với mong muốn (tùy chọn)...' : 'Enter your feedback on the generated images vs what you wanted (optional)...'}
+                    value={userFeedback}
+                    onChange={e => setUserFeedback(e.target.value)}
+                    style={{ width: '100%', minHeight: '60px', padding: '12px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none', resize: 'none' }}
+                />
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    {feedbackImages.map(img => (
+                        <div key={img.id} style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-default)' }}>
+                            <img src={img.data} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Feedback" />
+                            <button
+                                onClick={() => handleRemoveFeedbackImage(img.id)}
+                                style={{ position: 'absolute', top: '2px', right: '2px', background: 'var(--bg-error, #ef4444)', color: 'white', border: 'none', borderRadius: '50%', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}
+                            >
+                                <X size={9} />
+                            </button>
+                        </div>
+                    ))}
+
+                    {feedbackImages.length < 4 && (
+                        <label style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-3)', border: '1px dashed var(--border-strong)', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                            <input type="file" multiple accept="image/*" hidden onChange={handleFeedbackPhotoUpload} />
+                            <span style={{ fontSize: '18px', lineHeight: 1 }}>+</span>
+                        </label>
+                    )}
+                    {feedbackImages.length === 0 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', alignSelf: 'center', marginLeft: '4px' }}>
+                            {locale === 'vi' ? 'Upload ảnh mẫu mong muốn (tùy chọn)' : 'Upload desired target images (optional)'}
+                        </span>
+                    )}
+                </div>
             </div>
 
             {suggestion && (
