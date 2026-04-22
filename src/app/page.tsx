@@ -6,7 +6,7 @@ import type { StyleLibrary, AppSettings } from '@/types';
 import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings } from '@/lib/storage';
 import { type Locale, getLocale, setLocale as persistLocale, t } from '@/lib/i18n';
 import { deleteAllRefImages, deleteAllGenImages } from '@/lib/db';
-import { getSession, getUserRole, signOut, onAuthStateChange, type UserRole } from '@/lib/auth';
+import { getSession, getUserRole, getRoleFromSession, signOut, onAuthStateChange, type UserRole } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import Sidebar from '@/app/components/Sidebar';
 import AuthView from '@/app/components/AuthView';
@@ -60,8 +60,8 @@ export default function HomePage() {
       if (session?.user) {
         setIsAuthenticated(true);
         setUserEmail(session.user.email || '');
-        const role = await getUserRole(session.user.id);
-        setUserRole(role);
+        // Read role directly from session user metadata (server-verified)
+        setUserRole(getRoleFromSession(session.user));
       } else {
         setIsAuthenticated(false);
       }
@@ -76,8 +76,8 @@ export default function HomePage() {
       if (session?.user) {
         setIsAuthenticated(true);
         setUserEmail(session.user.email || '');
-        const role = await getUserRole(session.user.id);
-        setUserRole(role);
+        // Read role directly from the fresh session (always up-to-date)
+        setUserRole(getRoleFromSession(session.user));
       } else {
         setIsAuthenticated(false);
         setUserRole('user');

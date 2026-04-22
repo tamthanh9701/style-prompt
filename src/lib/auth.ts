@@ -22,15 +22,27 @@ export async function signOut() {
 }
 
 export async function getSession() {
+    // Use getUser() to get a fresh session verified from the server (not local cache)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
     const { data: { session } } = await supabase.auth.getSession();
     return session;
 }
 
+// Extract role directly from a session/user object (no extra API call)
+export function getRoleFromSession(user: { user_metadata?: Record<string, unknown> } | null | undefined): UserRole {
+    const role = user?.user_metadata?.role;
+    if (role === 'admin') return 'admin';
+    return 'user';
+}
+
 export async function getUserRole(userId: string): Promise<UserRole> {
-    // Primary: read role from JWT user_metadata (avoids circular RLS issue)
-    const { data: { session } } = await supabase.auth.getSession();
-    const metaRole = session?.user?.user_metadata?.role;
-    if (metaRole === 'admin' || metaRole === 'user') return metaRole as UserRole;
+    // Primary: get fresh user from server and read role from metadata
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const role = getRoleFromSession(user);
+        if (role === 'admin') return 'admin';
+    }
 
     // Fallback: query user_profiles table
     const { data, error } = await supabase.from('user_profiles').select('role').eq('id', userId).maybeSingle();
