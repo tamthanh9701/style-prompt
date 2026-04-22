@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import type { StyleLibrary, AppSettings } from '@/types';
 import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings } from '@/lib/storage';
 import { type Locale, getLocale, setLocale as persistLocale, t } from '@/lib/i18n';
@@ -8,15 +9,17 @@ import { deleteAllRefImages, deleteAllGenImages } from '@/lib/db';
 import { getSession, getUserRole, signOut, onAuthStateChange, type UserRole } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import Sidebar from '@/app/components/Sidebar';
-import LibraryView from '@/app/components/LibraryView';
-import CreateStyleView from '@/app/components/CreateStyleView';
-import EditStyleView from '@/app/components/EditStyleView';
-import GenerateView from '@/app/components/GenerateView';
-import ImageEditView from '@/app/components/ImageEditView';
-import LogsView from '@/app/components/LogsView';
-import SettingsView from '@/app/components/SettingsView';
 import AuthView from '@/app/components/AuthView';
-import UserManagementView from '@/app/components/UserManagementView';
+
+// Lazy-load heavy views — only download JS when the user navigates to them
+const LibraryView = dynamic(() => import('@/app/components/LibraryView'));
+const CreateStyleView = dynamic(() => import('@/app/components/CreateStyleView'));
+const EditStyleView = dynamic(() => import('@/app/components/EditStyleView'));
+const GenerateView = dynamic(() => import('@/app/components/GenerateView'));
+const ImageEditView = dynamic(() => import('@/app/components/ImageEditView'));
+const LogsView = dynamic(() => import('@/app/components/LogsView'));
+const SettingsView = dynamic(() => import('@/app/components/SettingsView'));
+const UserManagementView = dynamic(() => import('@/app/components/UserManagementView'));
 
 // ============================================================
 // Main App Component
