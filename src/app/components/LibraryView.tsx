@@ -19,7 +19,7 @@ function LibraryCoverImage({ libraryId, coverImageId }: { libraryId: string, cov
           if (refs.length > 0) record = refs[0];
         }
         if (record && isMounted) {
-          objectUrl = URL.createObjectURL(record.data);
+          objectUrl = typeof record.data === 'string' ? record.data : URL.createObjectURL(record.data);
           setUrl(objectUrl);
         }
       } catch (err) {
@@ -42,14 +42,16 @@ function LibraryCoverImage({ libraryId, coverImageId }: { libraryId: string, cov
   return <img src={url} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
 }
 
-export default function LibraryView({ styles, locale, onSelect, onCreate, onDelete }: {
+export default function LibraryView({ styles, locale, onSelect, onCreate, onDelete, role = 'admin' }: {
   styles: StyleLibrary[];
   locale: Locale;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  role?: 'admin' | 'user';
 }) {
   const L = (key: Parameters<typeof t>[1]) => t(locale, key);
+  const isAdmin = role === 'admin';
 
   return (
     <div>
@@ -58,9 +60,11 @@ export default function LibraryView({ styles, locale, onSelect, onCreate, onDele
           <h1 className="page-title">{L('lib_title')}</h1>
           <p className="page-subtitle">{L('lib_subtitle')}</p>
         </div>
-        <button className="btn btn-primary" onClick={onCreate} style={{ display: 'flex', alignItems: 'center', gap: '8px', borderRadius: 'var(--radius-full)', padding: '10px 24px' }}>
-          <PlusCircle size={16} /> {locale === 'vi' ? 'Tạo mới' : 'New Style'}
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={onCreate} style={{ display: 'flex', alignItems: 'center', gap: '8px', borderRadius: 'var(--radius-full)', padding: '10px 24px' }}>
+            <PlusCircle size={16} /> {locale === 'vi' ? 'Tạo mới' : 'New Style'}
+          </button>
+        )}
       </div>
 
       {styles.length === 0 ? (

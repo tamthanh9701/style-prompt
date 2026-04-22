@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { StyleLibrary, AppSettings, PromptSchema, PromptInstance, EvalRecord, StyleStatus } from '@/types';
-import { createEmptyPrompt, flattenPrompt, generateJsonPrompt, PROMPT_GROUPS, STYLE_GROUPS, SUBJECT_GROUPS, getGroupCategory, MAX_REFERENCE_IMAGES } from '@/types';
-import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings, fileToBase64, generateId, callAI, callImageGen, promoteStyle, createNewVersion, addPromptInstance, addEvalRecord } from '@/lib/storage';
-import { type Locale, getLocale, setLocale as persistLocale, t, getGroupLabel, getFieldLabel } from '@/lib/i18n';
-import { getRefImages, setRefImages, deleteAllRefImages, deleteAllGenImages, getGenImages, saveGenImage, deleteGenImage } from '@/lib/db';
+import type { StyleLibrary, AppSettings } from '@/types';
+import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings } from '@/lib/storage';
+import { type Locale, getLocale, setLocale as persistLocale, t } from '@/lib/i18n';
+import { deleteAllRefImages, deleteAllGenImages } from '@/lib/db';
+import { getSession, getUserRole, signOut, onAuthStateChange, type UserRole } from '@/lib/auth';
 import Sidebar from '@/app/components/Sidebar';
 import LibraryView from '@/app/components/LibraryView';
 import CreateStyleView from '@/app/components/CreateStyleView';
@@ -14,14 +14,14 @@ import GenerateView from '@/app/components/GenerateView';
 import ImageEditView from '@/app/components/ImageEditView';
 import LogsView from '@/app/components/LogsView';
 import SettingsView from '@/app/components/SettingsView';
-
-import FieldInput from '@/app/components/FieldInput';
+import AuthView from '@/app/components/AuthView';
+import UserManagementView from '@/app/components/UserManagementView';
 
 // ============================================================
 // Main App Component
 // ============================================================
 
-type View = 'library' | 'create' | 'edit' | 'generate' | 'image_edit' | 'settings' | 'logs';
+type View = 'library' | 'create' | 'edit' | 'generate' | 'image_edit' | 'settings' | 'logs' | 'users';
 
 export default function HomePage() {
   const [view, setView] = useState<View>('library');
@@ -33,22 +33,62 @@ export default function HomePage() {
   const [locale, setLocaleState] = useState<Locale>('vi');
   const [mounted, setMounted] = useState(false);
 
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = loading
+  const [userRole, setUserRole] = useState<UserRole>('user');
+  const [userEmail, setUserEmail] = useState<string>('');
+
   useEffect(() => {
+    setLocaleState(getLocale());
+
+    // Check existing session
+    getSession().then(async (session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        setUserEmail(session.user.email || '');
+        const role = await getUserRole(session.user.id);
+        setUserRole(role);
+      } else {
+        setIsAuthenticated(false);
+      }
+      setMounted(true);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        setUserEmail(session.user.email || '');
+        const role = await getUserRole(session.user.id);
+        setUserRole(role);
+      } else {
+        setIsAuthenticated(false);
+        setUserRole('user');
+        setUserEmail('');
+      }
+    });
+
+    return () => { subscription.unsubscribe(); };
+  }, []);
+
+  // Load app data once authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
     const allStyles = getStyles();
     setStyles(allStyles);
     setSettingsState(getSettings());
-    setLocaleState(getLocale());
-    setMounted(true);
 
-    // Call migration in background and auto-refresh styles if changes occurred
     import('@/lib/storage').then(module => {
+      module.syncStylesFromServer().then(() => {
+        setStyles(module.getStyles());
+      });
       module.migrateV1toV2().then((result) => {
         if (result && result.migrated > 0) {
-          setStyles(getStyles());
+          setStyles(module.getStyles());
         }
       });
     });
-  }, []);
+  }, [isAuthenticated]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
@@ -79,7 +119,6 @@ export default function HomePage() {
 
   const handleDeleteStyle = async (id: string) => {
     deleteStyle(id);
-    // Also delete images from IndexedDB
     await deleteAllRefImages(id);
     await deleteAllGenImages(id);
     refreshStyles();
@@ -93,30 +132,75 @@ export default function HomePage() {
     showToast(L('settings_saved'));
   };
 
-  if (!mounted || !settings) return null;
+  const handleLogout = async () => {
+    await signOut();
+    setView('library');
+  };
+
+  // Loading state
+  if (!mounted || isAuthenticated === null) return null;
+
+  // Not authenticated → show login
+  if (!isAuthenticated) {
+    return (
+      <>
+        <AuthView locale={locale} onSuccess={() => { }} showToast={showToast} />
+        {toast && (
+          <div className="toast-container">
+            <div className={`toast ${toast.type}`}>
+              {toast.type === 'success' && '✓'} {toast.type === 'error' && '✗'} {toast.type === 'warning' && '⚠'} {toast.message}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  if (!settings) return null;
+
+  // Role-based view filtering for users
+  const isAdmin = userRole === 'admin';
+  const visibleStyles = isAdmin ? styles : styles.filter(s => s.status === 'active');
+
+  const handleViewChange = (v: string) => {
+    // Block restricted views for non-admin
+    if (!isAdmin && ['create', 'edit', 'image_edit', 'settings', 'logs', 'users'].includes(v)) return;
+    setView(v as View);
+    if (v === 'library') setSelectedStyleId(null);
+  };
 
   return (
     <div className="app-shell">
-      {/* Sidebar Navigation */}
       <Sidebar
         currentView={view}
-        setView={(v) => {
-          setView(v as View);
-          if (v === 'library') setSelectedStyleId(null);
-        }}
+        setView={handleViewChange}
         locale={locale}
         setLocale={switchLocale}
+        role={userRole}
+        userEmail={userEmail}
+        onLogout={handleLogout}
       />
 
-      {/* Main Content Area */}
       <div className={view === 'generate' || view === 'image_edit' ? "app-main-fullscreen fade-in" : "app-main fade-in"}>
-        {view === 'library' && <LibraryView styles={styles} locale={locale} onSelect={(id) => { setSelectedStyleId(id); setView('edit'); }} onCreate={() => setView('create')} onDelete={handleDeleteStyle} />}
-        {view === 'create' && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
-        {view === 'edit' && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onDelete={handleDeleteStyle} onUpdate={handleUpdateStyle} onGenerate={() => setView('generate')} showToast={showToast} />}
-        {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('edit')} onUpdate={handleUpdateStyle} showToast={showToast} onRequestEdit={(imageId) => { setSelectedImageId(imageId); setView('image_edit'); }} />}
-        {view === 'image_edit' && selectedStyle && <ImageEditView style={selectedStyle} settings={settings} locale={locale} imageId={selectedImageId} onBack={() => setView('generate')} onUpdate={handleUpdateStyle} showToast={showToast} />}
-        {view === 'logs' && <LogsView locale={locale} onBack={() => setView('library')} />}
-        {view === 'settings' && <SettingsView settings={settings} locale={locale} onBack={() => setView('library')} onSave={handleSettingsSave} showToast={showToast} />}
+        {view === 'library' && (
+          <LibraryView
+            styles={visibleStyles} locale={locale}
+            onSelect={(id) => {
+              setSelectedStyleId(id);
+              setView(isAdmin ? 'edit' : 'generate');
+            }}
+            onCreate={() => setView('create')}
+            onDelete={handleDeleteStyle}
+            role={userRole}
+          />
+        )}
+        {view === 'create' && isAdmin && <CreateStyleView settings={settings} locale={locale} onBack={() => setView('library')} onCreate={handleCreateStyle} showToast={showToast} />}
+        {view === 'edit' && isAdmin && selectedStyle && <EditStyleView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView('library')} onDelete={handleDeleteStyle} onUpdate={handleUpdateStyle} onGenerate={() => setView('generate')} showToast={showToast} />}
+        {view === 'generate' && selectedStyle && <GenerateView style={selectedStyle} settings={settings} locale={locale} onBack={() => setView(isAdmin ? 'edit' : 'library')} onUpdate={handleUpdateStyle} showToast={showToast} onRequestEdit={(imageId) => { if (isAdmin) { setSelectedImageId(imageId); setView('image_edit'); } }} />}
+        {view === 'image_edit' && isAdmin && selectedStyle && <ImageEditView style={selectedStyle} settings={settings} locale={locale} imageId={selectedImageId} onBack={() => setView('generate')} onUpdate={handleUpdateStyle} showToast={showToast} />}
+        {view === 'logs' && isAdmin && <LogsView locale={locale} onBack={() => setView('library')} />}
+        {view === 'settings' && isAdmin && <SettingsView settings={settings} locale={locale} onBack={() => setView('library')} onSave={handleSettingsSave} showToast={showToast} />}
+        {view === 'users' && isAdmin && <UserManagementView locale={locale} showToast={showToast} onBack={() => setView('library')} />}
       </div>
 
       {toast && (
@@ -129,9 +213,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-
-
-
-

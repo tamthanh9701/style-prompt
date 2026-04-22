@@ -1,13 +1,32 @@
 import type { StyleLibrary, AppSettings, AIProviderType, PromptInstance, EvalRecord } from '@/types';
+import { supabase } from './supabase';
 
 const STORAGE_KEY = 'style_prompt_library';
 const SETTINGS_KEY = 'style_prompt_settings';
 
 // ============================================================
 // Style Library Storage
-// NOTE: Images are stored in IndexedDB (src/lib/db.ts)
-//       Only metadata is kept in localStorage
+// NOTE: Images are stored in Supabase/IndexedDB (src/lib/db.ts)
+//       Only metadata is kept in localStorage with Supabase sync
 // ============================================================
+
+export async function syncStylesFromServer() {
+  if (typeof window === 'undefined') return;
+  try {
+    const { data, error } = await supabase.from('styles').select('data').eq('id', 'main_library').maybeSingle();
+    if (error) {
+      console.error('Failed to sync styles from server (DB error)', error);
+      return;
+    }
+    if (data && data.data) {
+      const serverStyles = data.data as StyleLibrary[];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serverStyles));
+      console.log('✅ Synchronized styles from Supabase');
+    }
+  } catch (err) {
+    console.error('Failed to sync styles from server', err);
+  }
+}
 
 export function getStyles(): StyleLibrary[] {
   if (typeof window === 'undefined') return [];
@@ -31,6 +50,10 @@ export function saveStyles(styles: StyleLibrary[]): void {
     prompt_history: [],
   }));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
+
+  // Background cloud sync
+  supabase.from('styles').upsert({ id: 'main_library', data: stripped, updated_at: new Date().toISOString() })
+    .then(({ error }) => { if (error) console.error('Supabase styles sync failed', error) });
 }
 
 export function getStyleById(id: string): StyleLibrary | undefined {

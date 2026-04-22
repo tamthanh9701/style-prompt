@@ -41,7 +41,7 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
           setRefRecords(records);
           const urls: Record<string, string> = {};
           records.forEach(r => {
-            urls[r.id] = URL.createObjectURL(r.data);
+            urls[r.id] = typeof r.data === 'string' ? r.data : URL.createObjectURL(r.data);
           });
           setImageUrls(urls);
           setLoadingImages(false);

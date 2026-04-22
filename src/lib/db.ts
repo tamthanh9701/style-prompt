@@ -1,4 +1,5 @@
 import { RefImageRecord, GenImageRecord, GenerationJob } from '../types';
+import { supabase, uploadImage, getPublicUrl, deleteImage } from './supabase';
 export type { RefImageRecord, GenImageRecord, GenerationJob };
 
 // ============================================================
@@ -181,6 +182,16 @@ function txDeleteByIndex(store: StoreName, indexName: string, value: string): Pr
 
 export async function getRefImages(libraryId: string): Promise<RefImageRecord[]> {
   if (typeof window === 'undefined') return [];
+  try {
+    const { data } = await supabase.from('ref_images').select('*').eq('library_id', libraryId);
+    if (data && data.length > 0) {
+      const serverRecords = data.map((d: any) => ({
+        id: d.id, libraryId: d.library_id, data: getPublicUrl('images', d.storage_path),
+        mimeType: d.mime_type, index: d.index, source: d.source, sourceJobId: d.source_job_id, addedAt: d.added_at
+      }));
+      return serverRecords.sort((a, b) => a.index - b.index);
+    }
+  } catch (e) { console.warn('Supabase fetch failed', e); }
   const records = await txGetAllByIndex<RefImageRecord>(STORES.REFERENCE_IMAGES, 'libraryId', libraryId);
   return records.sort((a, b) => a.index - b.index);
 }
@@ -192,24 +203,52 @@ export async function getRefImageById(id: string): Promise<RefImageRecord | unde
 
 export async function setRefImages(libraryId: string, records: RefImageRecord[]): Promise<void> {
   if (typeof window === 'undefined') return;
-  await txDeleteByIndex(STORES.REFERENCE_IMAGES, 'libraryId', libraryId);
+  await deleteAllRefImages(libraryId);
   for (const record of records) {
-    await txPut(STORES.REFERENCE_IMAGES, record);
+    await putRefImage(record);
   }
 }
 
 export async function putRefImage(record: RefImageRecord): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    const storagePath = `${record.libraryId}/ref/${record.id}`;
+    if (record.data instanceof Blob) {
+      await uploadImage('images', storagePath, record.data, record.mimeType);
+      record.data = getPublicUrl('images', storagePath); // Update local to point to server
+    }
+    await supabase.from('ref_images').upsert({
+      id: record.id, library_id: record.libraryId, storage_path: storagePath,
+      mime_type: record.mimeType, index: record.index, source: record.source,
+      source_job_id: record.sourceJobId, added_at: record.addedAt
+    });
+  } catch (e) { console.error('Failed to sync to Supabase', e); }
   await txPut(STORES.REFERENCE_IMAGES, record);
 }
 
 export async function deleteRefImage(id: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    const ref = await txGet<RefImageRecord>(STORES.REFERENCE_IMAGES, id);
+    if (ref) {
+      await deleteImage('images', `${ref.libraryId}/ref/${id}`);
+      await supabase.from('ref_images').delete().eq('id', id);
+    }
+  } catch (e) { }
   await txDelete(STORES.REFERENCE_IMAGES, id);
 }
 
 export async function deleteAllRefImages(libraryId: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    const { data } = await supabase.from('ref_images').select('id').eq('library_id', libraryId);
+    if (data) {
+      for (const d of data) {
+        await deleteImage('images', `${libraryId}/ref/${d.id}`).catch(() => { });
+      }
+    }
+    await supabase.from('ref_images').delete().eq('library_id', libraryId);
+  } catch (e) { }
   await txDeleteByIndex(STORES.REFERENCE_IMAGES, 'libraryId', libraryId);
 }
 
@@ -219,6 +258,18 @@ export async function deleteAllRefImages(libraryId: string): Promise<void> {
 
 export async function getGenImages(libraryId: string): Promise<GenImageRecord[]> {
   if (typeof window === 'undefined') return [];
+  try {
+    const { data } = await supabase.from('gen_images').select('*').eq('library_id', libraryId);
+    if (data && data.length > 0) {
+      const serverRecords = data.map((d: any) => ({
+        id: d.id, libraryId: d.library_id, jobId: d.job_id,
+        data: getPublicUrl('images', d.storage_path), mimeType: d.mime_type,
+        createdAt: d.created_at, generationSource: d.generation_source,
+        aspectRatio: d.aspect_ratio, promptText: d.prompt_text, promptJson: typeof d.prompt_json === 'string' ? d.prompt_json : JSON.stringify(d.prompt_json)
+      }));
+      return serverRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  } catch (e) { console.warn('Supabase fetch failed', e); }
   const records = await txGetAllByIndex<GenImageRecord>(STORES.GENERATED_IMAGES, 'libraryId', libraryId);
   return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
@@ -230,16 +281,45 @@ export async function getGenImageById(id: string): Promise<GenImageRecord | unde
 
 export async function saveGenImage(record: GenImageRecord): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    const storagePath = `${record.libraryId}/gen/${record.id}`;
+    if (record.data instanceof Blob) {
+      await uploadImage('images', storagePath, record.data, record.mimeType || 'image/jpeg');
+      record.data = getPublicUrl('images', storagePath);
+    }
+    await supabase.from('gen_images').upsert({
+      id: record.id, library_id: record.libraryId, job_id: record.jobId,
+      storage_path: storagePath, mime_type: record.mimeType, created_at: record.createdAt,
+      generation_source: record.generationSource, aspect_ratio: record.aspectRatio,
+      prompt_text: record.promptText, prompt_json: record.promptJson ? JSON.parse(record.promptJson) : null
+    });
+  } catch (e) { console.error('Failed to sync to Supabase', e); }
   await txPut(STORES.GENERATED_IMAGES, record);
 }
 
 export async function deleteGenImage(id: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    const ref = await txGet<GenImageRecord>(STORES.GENERATED_IMAGES, id);
+    if (ref) {
+      await deleteImage('images', `${ref.libraryId}/gen/${id}`);
+      await supabase.from('gen_images').delete().eq('id', id);
+    }
+  } catch (e) { }
   await txDelete(STORES.GENERATED_IMAGES, id);
 }
 
 export async function deleteAllGenImages(libraryId: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    const { data } = await supabase.from('gen_images').select('id').eq('library_id', libraryId);
+    if (data) {
+      for (const d of data) {
+        await deleteImage('images', `${libraryId}/gen/${d.id}`).catch(() => { });
+      }
+    }
+    await supabase.from('gen_images').delete().eq('library_id', libraryId);
+  } catch (e) { }
   await txDeleteByIndex(STORES.GENERATED_IMAGES, 'libraryId', libraryId);
 }
 
@@ -249,17 +329,28 @@ export async function deleteAllGenImages(libraryId: string): Promise<void> {
 
 export async function getGenerationJobs(libraryId: string): Promise<GenerationJob[]> {
   if (typeof window === 'undefined') return [];
+  try {
+    const { data } = await supabase.from('gen_jobs').select('*').eq('library_id', libraryId);
+    if (data && data.length > 0) {
+      const serverRecords = data.map((d: any) => d.data as GenerationJob);
+      return serverRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  } catch (e) { }
   const records = await txGetAllByIndex<GenerationJob>(STORES.GENERATION_JOBS, 'libraryId', libraryId);
   return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function saveGenerationJob(record: GenerationJob): Promise<void> {
   if (typeof window === 'undefined') return;
+  try {
+    await supabase.from('gen_jobs').upsert({ id: record.id, library_id: record.libraryId, data: record, created_at: record.createdAt });
+  } catch (e) { }
   await txPut(STORES.GENERATION_JOBS, record);
 }
 
 export async function deleteGenerationJob(id: string): Promise<void> {
   if (typeof window === 'undefined') return;
+  try { await supabase.from('gen_jobs').delete().eq('id', id); } catch (e) { }
   await txDelete(STORES.GENERATION_JOBS, id);
 }
 
@@ -281,7 +372,20 @@ export function base64ToBlob(base64: string, mimeType?: string): Blob {
   return new Blob([uInt8Array], { type: contentType });
 }
 
-export function blobToBase64(blob: Blob): Promise<string> {
+export async function blobToBase64(blob: Blob | string): Promise<string> {
+  if (typeof blob === 'string') {
+    if (blob.startsWith('data:')) return blob;
+    try {
+      const response = await fetch(blob);
+      if (!response.ok) throw new Error('Failed to fetch image URL');
+      const downloadedBlob = await response.blob();
+      return blobToBase64(downloadedBlob);
+    } catch (err) {
+      console.error('Failed to convert URL to base64', err);
+      throw err;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);

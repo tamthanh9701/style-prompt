@@ -199,7 +199,7 @@ export const MAX_REFERENCE_IMAGES = 10;
 export interface RefImageRecord {
   id: string;
   libraryId: string;
-  data: Blob;
+  data: Blob | string;
   mimeType: string;
   index: number;
   source: 'original' | 'generated'; // MỤC ĐÍCH: Tracking phạt trọng số chống Drift

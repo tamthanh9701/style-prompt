@@ -526,7 +526,7 @@ export default function GenerateView({ style, settings, locale, onBack, onUpdate
                     >
                       <option value="">{locale === 'vi' ? 'Góc máy' : 'Angle'}</option>
                       {[
-                        { value: 'Isometric', vi: 'Góc đẳng cự', en: 'Isometric' },
+                        { value: 'Isometric', vi: 'Isometric', en: 'Isometric' },
                         { value: 'Low Angle', vi: 'Góc thấp', en: 'Low Angle' },
                         { value: 'Eye-Level', vi: 'Ngang tầm mắt', en: 'Eye-Level' },
                         { value: 'Top-Down', vi: 'Nhìn từ trên', en: 'Top-Down' },
