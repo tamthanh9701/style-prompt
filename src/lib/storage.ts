@@ -348,8 +348,61 @@ function createDefaultSettings(): AppSettings {
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
+    // If it's not an image (e.g., PDF someday), just read it normally
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Optimal size for AI models like Gemini/GPT-4V is roughly 1536x1536 or under.
+        const MAX_SIZE = 1536;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          } else {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          // Fallback if canvas fails
+          resolve(e.target?.result as string);
+          return;
+        }
+
+        // Draw image and export as compressed JPEG
+        ctx.fillStyle = '#FFFFFF'; // Handle transparent backgrounds
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Quality 0.85 is very high quality but significantly smaller filesize than original 
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(compressedBase64);
+      };
+      img.onerror = reject;
+      if (typeof e.target?.result === 'string') {
+        img.src = e.target.result;
+      } else {
+        reject(new Error('Failed to read file as Data URL'));
+      }
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
