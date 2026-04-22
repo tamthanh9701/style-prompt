@@ -43,7 +43,11 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
     setAnalyzing(true);
     setAnalysisResult(null);
     try {
-      const result = await callAI(settings, 'analyzeStyle', images);
+      // Limit to 10 images max to prevent Vercel 4.5MB "Request Entity Too Large" payload error.
+      // 10 images at 1536px/0.85q is ~2.5MB, well within the 4.5MB limit.
+      // All 20+ images are still saved locally to IndexedDB as reference images later.
+      const imagesToAnalyze = images.slice(0, 10);
+      const result = await callAI(settings, 'analyzeStyle', imagesToAnalyze);
 
       const payloadSchema = result.schema || result; // Backward compat fallback
       const meta = result._analysis_meta || { confidence: 'high', notes: 'Style analysis complete.' };
