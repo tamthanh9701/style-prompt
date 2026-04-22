@@ -52,6 +52,9 @@ export default function HomePage() {
         setIsAuthenticated(false);
       }
       setMounted(true);
+    }).catch(() => {
+      setIsAuthenticated(false);
+      setMounted(true);
     });
 
     // Listen for auth changes
@@ -137,8 +140,14 @@ export default function HomePage() {
     setView('library');
   };
 
-  // Loading state
-  if (!mounted || isAuthenticated === null) return null;
+  // Loading state — show a spinner instead of blank screen
+  if (!mounted || isAuthenticated === null) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary, #0f0f10)', color: '#888', fontSize: '0.9rem' }}>
+        Đang tải...
+      </div>
+    );
+  }
 
   // Not authenticated → show login
   if (!isAuthenticated) {
@@ -156,7 +165,13 @@ export default function HomePage() {
     );
   }
 
-  if (!settings) return null;
+  if (!settings) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary, #0f0f10)', color: '#888', fontSize: '0.9rem' }}>
+        Đang tải cài đặt...
+      </div>
+    );
+  }
 
   // Role-based view filtering for users
   const isAdmin = userRole === 'admin';
