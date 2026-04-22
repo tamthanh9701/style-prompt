@@ -4,6 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
 
+// Check if Supabase is actually configured (not using placeholder values)
+export const isSupabaseConfigured = !supabaseUrl.includes('placeholder') && supabaseAnonKey !== 'placeholder';
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function uploadImage(bucket: string, path: string, blob: Blob | Buffer, contentType: string) {

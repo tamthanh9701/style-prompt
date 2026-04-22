@@ -6,6 +6,7 @@ import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSetting
 import { type Locale, getLocale, setLocale as persistLocale, t } from '@/lib/i18n';
 import { deleteAllRefImages, deleteAllGenImages } from '@/lib/db';
 import { getSession, getUserRole, signOut, onAuthStateChange, type UserRole } from '@/lib/auth';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import Sidebar from '@/app/components/Sidebar';
 import LibraryView from '@/app/components/LibraryView';
 import CreateStyleView from '@/app/components/CreateStyleView';
@@ -41,8 +42,18 @@ export default function HomePage() {
   useEffect(() => {
     setLocaleState(getLocale());
 
-    // Check existing session
-    getSession().then(async (session) => {
+    // If Supabase is not properly configured (placeholder URL), skip auth entirely
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured — env vars may not be baked in. Showing login screen.');
+      setIsAuthenticated(false);
+      setMounted(true);
+      return;
+    }
+
+    // Race between getSession and a 5-second timeout to prevent infinite hang
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+
+    Promise.race([getSession(), timeout]).then(async (session) => {
       if (session?.user) {
         setIsAuthenticated(true);
         setUserEmail(session.user.email || '');
