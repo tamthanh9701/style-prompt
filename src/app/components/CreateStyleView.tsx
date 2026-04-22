@@ -23,7 +23,16 @@ export default function CreateStyleView({ settings, locale, onBack, onCreate, sh
 
   const handleFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files).filter(f => f.type.startsWith('image/'));
-    const base64s = await Promise.all(fileArray.map(fileToBase64));
+    const base64s: string[] = [];
+
+    // Process sequentially so we don't freeze the browser with 20+ simultaneous Canvas renders
+    for (const file of fileArray) {
+      const b64 = await fileToBase64(file);
+      base64s.push(b64);
+      // Yield thread to prevent UI lockup
+      await new Promise(r => setTimeout(r, 10));
+    }
+
     setImages(prev => [...prev, ...base64s]);
   };
 
