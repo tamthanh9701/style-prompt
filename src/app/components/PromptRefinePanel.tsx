@@ -60,9 +60,8 @@ export default function PromptRefinePanel({
             const rImgs = refRecords.slice(0, 2);
 
             const b64Gen = await Promise.all(gImgs.map(i => {
-                if (typeof i.data === 'string') return i.data;
-                if (i.data instanceof Blob) return blobToBase64(i.data);
-                return '';
+                // Ensure Supabase HTTP URLs are fetched and converted to base64 via blobToBase64
+                return blobToBase64(i.data);
             }));
             const b64Ref = await Promise.all(rImgs.map(i => blobToBase64(i.data)));
             const b64Feedback = feedbackImages.map(f => f.data);
