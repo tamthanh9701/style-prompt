@@ -27,6 +27,12 @@ export async function getSession() {
 }
 
 export async function getUserRole(userId: string): Promise<UserRole> {
+    // Primary: read role from JWT user_metadata (avoids circular RLS issue)
+    const { data: { session } } = await supabase.auth.getSession();
+    const metaRole = session?.user?.user_metadata?.role;
+    if (metaRole === 'admin' || metaRole === 'user') return metaRole as UserRole;
+
+    // Fallback: query user_profiles table
     const { data, error } = await supabase.from('user_profiles').select('role').eq('id', userId).maybeSingle();
     if (error || !data) return 'user';
     return data.role as UserRole;
