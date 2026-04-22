@@ -228,8 +228,60 @@ export function addEvalRecord(styleId: string, record: EvalRecord): void {
 }
 
 // ============================================================
-// Settings Storage
+// Settings Storage (localStorage cache + Supabase global sync)
 // ============================================================
+
+// Load global settings from Supabase server → save to localStorage cache
+export async function syncSettingsFromServer(): Promise<AppSettings> {
+  const defaults = createDefaultSettings();
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const { data, error } = await supabase.from('app_settings').select('data').eq('id', 'global').maybeSingle();
+    if (error) {
+      console.error('Failed to sync settings from server', error);
+      return getSettings(); // fallback to local
+    }
+    if (data && data.data) {
+      const serverSettings = data.data as AppSettings;
+      // Merge with defaults to ensure new fields exist
+      const mergedProviders = { ...defaults.providers };
+      for (const key of Object.keys(serverSettings.providers || {}) as Array<keyof typeof serverSettings.providers>) {
+        mergedProviders[key] = { ...defaults.providers[key], ...serverSettings.providers[key] };
+      }
+      const merged: AppSettings = {
+        ...defaults,
+        ...serverSettings,
+        providers: mergedProviders,
+        image_gen: { ...defaults.image_gen, ...(serverSettings.image_gen || {}) },
+      };
+      // Cache locally for fast access
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+      console.log('✅ Synchronized settings from Supabase');
+      return merged;
+    }
+  } catch (err) {
+    console.error('Failed to sync settings from server', err);
+  }
+  return getSettings(); // fallback to local
+}
+
+// Save settings to Supabase server (admin only)
+export async function saveSettingsToServer(settings: AppSettings): Promise<void> {
+  try {
+    const { error } = await supabase.from('app_settings').upsert({
+      id: 'global',
+      data: settings,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error('Failed to save settings to server', error);
+    } else {
+      console.log('✅ Settings saved to Supabase');
+    }
+  } catch (err) {
+    console.error('Failed to save settings to server', err);
+  }
+}
 
 export function getSettings(): AppSettings {
   if (typeof window === 'undefined') {
@@ -262,6 +314,8 @@ export function getSettings(): AppSettings {
 export function saveSettings(settings: AppSettings): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  // Also persist to server (async, non-blocking)
+  saveSettingsToServer(settings);
 }
 
 function createDefaultSettings(): AppSettings {

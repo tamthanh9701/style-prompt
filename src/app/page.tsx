@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type { StyleLibrary, AppSettings } from '@/types';
-import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings } from '@/lib/storage';
+import { getStyles, addStyle, updateStyle, deleteStyle, getSettings, saveSettings, syncSettingsFromServer } from '@/lib/storage';
 import { type Locale, getLocale, setLocale as persistLocale, t } from '@/lib/i18n';
 import { deleteAllRefImages, deleteAllGenImages } from '@/lib/db';
 import { getSession, getUserRole, getRoleFromSession, signOut, onAuthStateChange, type UserRole } from '@/lib/auth';
@@ -93,7 +93,13 @@ export default function HomePage() {
     if (!isAuthenticated) return;
     const allStyles = getStyles();
     setStyles(allStyles);
+    // Load local cache immediately for fast display
     setSettingsState(getSettings());
+
+    // Then sync from server (global settings shared by all users)
+    syncSettingsFromServer().then((serverSettings) => {
+      setSettingsState(serverSettings);
+    });
 
     import('@/lib/storage').then(module => {
       module.syncStylesFromServer().then(() => {
