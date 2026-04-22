@@ -180,7 +180,18 @@ export default function EditStyleView({ style, settings, locale, onBack, onUpdat
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <a href="#" className="back-link" onClick={(e) => { e.preventDefault(); handleBack(); }}>{L('back_library')}</a>
-          <h1 className="page-title">{style.name}</h1>
+          <input
+            type="text"
+            className="page-title"
+            style={{
+              background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border-strong)',
+              outline: 'none', color: 'var(--text-primary)', width: '100%', minWidth: '300px',
+              padding: '0', margin: '0'
+            }}
+            value={prompt.style_name || style.name || ''}
+            onChange={(e) => setPrompt(prev => ({ ...prev, style_name: e.target.value }))}
+            placeholder={locale === 'vi' ? 'Tên thư viện...' : 'Library name...'}
+          />
           <p className="page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             v{style.version || 1} • <span className="style-card-badge">{style.styleType || 'photo'}</span>
           </p>
